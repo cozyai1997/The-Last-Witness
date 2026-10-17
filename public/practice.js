@@ -34,6 +34,8 @@
   function ownView(E, state, playerId) {
     const view = clone(E.publicView(state)), self = state.players.find(p => p.id === playerId);
     view.self = { id: self.id, name: self.name, role: self.role, clues: clone(self.clues), shared: clone(self.shared), sabotageLeft: self.sabotageLeft, guardLeft: self.guardLeft };
+    if (self.role === 'culprit' && self.sealOutcome) view.self.sealOutcome = clone(self.sealOutcome);
+    if (self.role === 'culprit' && self.sealOutcomes?.length) view.self.sealOutcomes = clone(self.sealOutcomes);
     if (E.ROLES[self.role].team === 'criminals') {
       view.caseSecret = clone(state.secretNPC); view.remainingLies = 2 - state.liesUsed;
       view.partnerIds = state.players.filter(p => p.id !== self.id && E.ROLES[p.role].team === 'criminals').map(p => p.id);
@@ -94,7 +96,7 @@
   }
   function rankedCategories(E, view) {
     const pool = viable(E, view), total = pool.length;
-    return E.CATEGORIES.filter(c => !view.facts.some(f => f.category === c.id)).map(c => {
+    return E.CATEGORIES.filter(c => !view.facts.some(f => f.category === c.id) && !view.self.clues.some(f => f.category === c.id)).map(c => {
       const zero = pool.filter(w => valueOf(E, w, c.id) === 0).length;
       const branches = [0, 1].map(value => E.candidates({ ...view, statements: [...view.statements, { category: c.id, value }] }).length);
       const repeats = view.statements.filter(s => s.category === c.id).length;
@@ -104,8 +106,10 @@
   function detectiveInvestigation(E, view, random, memory) {
     const pool = viable(E, view), ranked = rankedCategories(E, view);
     if (pool.length <= 1 || !ranked.length) return { type: 'INVESTIGATE', kind: 'pass' };
-    const category = ranked[0].category;
-    if (view.kits > 0 && view.round >= 4) return { type: 'INVESTIGATE', kind: 'search', category };
+    if (view.kits > 0 && view.round >= 4) return { type: 'INVESTIGATE', kind: 'search', category: ranked[0].category };
+    const completed = new Set([...(view.questionHistory || []).map(q => q.category), ...view.statements.map(s => s.category), ...view.self.clues.map(c => c.category)]);
+    const category = ranked.find(c => !completed.has(c.category))?.category;
+    if (!category) return { type: 'INVESTIGATE', kind: 'pass' };
     const targets = view.players.filter(p => p.id !== view.self.id).map(p => ({
       id: p.id, score: view.statements.filter(s => s.speakerId === p.id).length + (memory.unknownTargets.has(p.id) ? -3 : 0), tie: random()
     })).sort((a, b) => b.score - a.score || a.tie - b.tie);
@@ -122,7 +126,7 @@
     if (view.phase === 'reveal') return { type: 'ROLE_SEEN' };
     if (view.phase === 'secret') {
       const share = view.self.clues.find(c => !view.self.shared.includes(c.category));
-      if (share && !(view.rulesVersion === 2 && view.players.length === 2)) return { type: 'SECRET_ACTION', kind: 'share', category: share.category };
+      if (share && !(view.rulesVersion >= 2 && view.players.length === 2)) return { type: 'SECRET_ACTION', kind: 'share', category: share.category };
       const ranked = rankedCategories(E, view), category = ranked[0]?.category || E.CATEGORIES[Math.floor(random() * E.CATEGORIES.length)].id;
       if (view.caseSecret && view.self.sabotageLeft > 0 && !view.sabotage && view.round < 5 && random() < .78) return { type: 'SECRET_ACTION', kind: 'seal', category };
       if (view.self.role === 'suspect' && view.self.guardLeft > 0 && [2, 3].includes(view.round)) return { type: 'SECRET_ACTION', kind: 'guard', category };

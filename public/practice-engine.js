@@ -131,16 +131,22 @@
     });
     var detective = players.find(function (player) { return player.role === 'detective'; });
     var witnesses = players.filter(function (player) { return player.role === 'witness'; });
-    var recipients = playerNames.length === 2 ? [detective, detective] : playerNames.length < 5 ? [detective, witnesses[0]] : witnesses;
-    var clueCategories = shuffled(CATEGORIES, random).slice(0, 2);
-    recipients.forEach(function (recipient, index) {
-      var category = clueCategories[index].id;
-      recipient.clues.push({ category: category, value: caseValue(secret, category) });
+    var personHint = shuffled(CATEGORIES.slice(0, 3), random)[0];
+    var sceneHint = shuffled(CATEGORIES.slice(3), random)[0];
+    [personHint, sceneHint].forEach(function (category) {
+      detective.clues.push({ category: category.id, value: caseValue(secret, category.id) });
+    });
+    var witnessCategories = shuffled(CATEGORIES.filter(function (category) {
+      return category.id !== personHint.id && category.id !== sceneHint.id;
+    }), random);
+    witnesses.forEach(function (witness, index) {
+      var category = witnessCategories[index].id;
+      witness.clues.push({ category: category, value: caseValue(secret, category) });
     });
     var state = {
-      rulesVersion: 2, phase: 'reveal', round: 1, players: players, detectiveId: detective.id, turnIndex: 0,
+      rulesVersion: 3, phase: 'reveal', round: 1, players: players, detectiveId: detective.id, turnIndex: 0,
       kits: 1, liesUsed: 0, secretNPC: secret, sabotage: null, guard: null,
-      statements: [], facts: [], log: [], notes: [], pending: null, review: null, winner: null, accusation: null
+      statements: [], facts: [], log: [], notes: [], questionHistory: [], pending: null, review: null, winner: null, accusation: null
     };
     if (players.length === 2) {
       detective.clues.forEach(function (clue) {
@@ -193,6 +199,24 @@
   function blocked(state, category) {
     return state.sabotage && state.sabotage.category === category && (!state.guard || state.guard.category !== category);
   }
+  function addQuestionHistory(state, category, status) {
+    if (!Array.isArray(state.questionHistory)) state.questionHistory = [];
+    state.questionHistory.push({ round: state.round, category: category, status: status });
+  }
+  function settleSeal(state, investigationCategory) {
+    if (!state.sabotage) return;
+    var culprit = state.players.find(function (player) { return player.role === 'culprit'; });
+    if (!culprit) return;
+    var success = !!state.review && state.review.kind === 'blocked';
+    var reason = success ? 'blocked' : !investigationCategory ? 'unused'
+      : investigationCategory === state.sabotage.category && state.guard && state.guard.category === investigationCategory ? 'guarded' : 'missed';
+    culprit.sealOutcome = { round: state.round, success: success, reason: reason };
+    culprit.sealOutcomes = (Array.isArray(culprit.sealOutcomes) ? culprit.sealOutcomes : []).filter(function (entry) { return entry.round !== state.round; }).concat([copy(culprit.sealOutcome)]).slice(-MAX_ROUNDS);
+  }
+  function safeSealOutcome(outcome) {
+    if (!outcome || !Number.isInteger(outcome.round) || outcome.round < 1 || outcome.round > MAX_ROUNDS || typeof outcome.success !== 'boolean' || !['blocked', 'guarded', 'missed', 'unused'].includes(outcome.reason)) return null;
+    return { round: outcome.round, success: outcome.success, reason: outcome.reason };
+  }
   function act(state, event) {
     turnOwner(state);
     if (state.phase === 'finished') fail('이미 종료된 게임입니다.');
@@ -243,6 +267,7 @@
           if (blocked(state, category.id)) {
             addLog(next, 'blocked', '수사 봉쇄 · ' + category.label + ' · 이번 라운드의 수사가 종료되었습니다.');
             setReview(next, 'blocked', Object.assign({ category: category.id }, event.kind === 'question' ? { targetId: actor.id, proposedValue: event.proposedValue === undefined ? 0 : event.proposedValue } : {}));
+            addQuestionHistory(next, category.id, 'blocked');
             next.phase = 'discussion';
           } else if (event.kind === 'question') {
             next.pending = { targetId: actor.id, category: category.id, proposedValue: event.proposedValue === undefined ? 0 : event.proposedValue };
@@ -271,6 +296,7 @@
           setReview(next, 'pass');
           next.phase = 'discussion';
         } else fail('유효한 수사 행동을 선택하세요.');
+        if (next.phase === 'discussion') settleSeal(next, event.kind === 'question' || event.kind === 'search' ? category.id : null);
         break;
       case 'ANSWER':
         requirePhase(state, ['answer']); requireOwner(state, event.actorId);
@@ -297,6 +323,8 @@
         }
         next.pending = null;
         next.phase = 'discussion';
+        addQuestionHistory(next, category.id, event.value === null ? 'unknown' : 'answered');
+        settleSeal(next, category.id);
         break;
       case 'ADD_NOTE':
         requirePhase(state, ['reveal', 'secret', 'investigate', 'answer', 'discussion', 'final']); actor = playerById(state, event.speakerId);
@@ -342,6 +370,9 @@
     var view = {};
     ['phase', 'round', 'turnIndex', 'kits', 'statements', 'facts', 'log', 'notes', 'pending', 'detectiveId', 'winner', 'accusation'].forEach(function (key) { view[key] = copy(state[key]); });
     view.rulesVersion = state.rulesVersion || 1;
+    view.questionHistory = (Array.isArray(state.questionHistory) ? state.questionHistory : []).filter(function (entry) {
+      return entry && Number.isInteger(entry.round) && entry.round >= 1 && entry.round <= MAX_ROUNDS && CATEGORIES.some(function (category) { return category.id === entry.category; }) && ['blocked', 'answered', 'unknown'].includes(entry.status);
+    }).map(function (entry) { return { round: entry.round, category: entry.category, status: entry.status }; });
     view.review = null;
     if (state.review) {
       view.review = {};
@@ -367,6 +398,11 @@
     requirePhase(state, ['reveal', 'secret', 'answer']); requireOwner(state, actorId);
     var actor = playerById(state, actorId), view = copy(publicView(state));
     view.self = { id: actor.id, name: actor.name, role: actor.role, clues: copy(actor.clues), shared: copy(actor.shared), sabotageLeft: actor.sabotageLeft, guardLeft: actor.guardLeft };
+    if (actor.role === 'culprit') {
+      var sealOutcome = safeSealOutcome(actor.sealOutcome);
+      if (sealOutcome) view.self.sealOutcome = sealOutcome;
+      if (Array.isArray(actor.sealOutcomes)) view.self.sealOutcomes = actor.sealOutcomes.map(safeSealOutcome).filter(Boolean).slice(-MAX_ROUNDS);
+    }
     if (isCriminal(actor)) {
       view.caseSecret = copy(state.secretNPC);
       view.remainingLies = LIE_LIMIT - state.liesUsed;

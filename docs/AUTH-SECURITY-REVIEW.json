@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-17T08:05:34.781Z",
+  "recordedAt": "2026-10-17T08:38:14.450Z",
   "scope": "Independent controlled-race and projection review, not a penetration test",
   "storage": "Isolated in-memory test store; synthetic cases only",
   "productionRequests": 0,
   "runtimeFilesModified": false,
   "sourceSHA256": {
     "lib/passwords.cjs": "91cbebd77f19093a156a3e19683f13549659e4ac863dec81230c838a144d4f69",
-    "lib/game-service.cjs": "ca612c1acc70222a8a9546c42c7a004d7480696696bd2b83c50ff1c6c453e609",
-    "lib/party-engine.cjs": "d281d4b7e15e56a0f81775226b58fd3cefed943ef2a346dcc91ef4176a3742b6"
+    "lib/game-service.cjs": "f9c837a1bcf1d516f2b784df640157ef2ea751ec17c2a6fac365efa0f01b8375",
+    "lib/party-engine.cjs": "fa22bc3d77d48f3c6e490faf20845fcdbbfbdd566827a5080e773f599883c125"
   },
   "passed": true,
   "checkCount": 5,

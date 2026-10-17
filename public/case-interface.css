@@ -24,5 +24,7 @@
 @media(prefers-reduced-motion:reduce){.case-spinner{animation:none}.case-modal-root *{scroll-behavior:auto!important}}
 
 .case-resource-button{width:100%;text-align:left;background:transparent;white-space:nowrap}.case-resource p{word-break:keep-all;overflow-wrap:anywhere}
+.case-review.is-verified-lie{border:2px solid #e4594f;border-radius:5px;padding:20px 22px;background:linear-gradient(145deg,#75261e18,#190f0d0a);box-shadow:0 0 0 1px #6e292355,0 0 30px #9b28131c}.case-review.is-verified-lie .case-letter-label{color:#f1a89b}.case-verified.is-lie{border:1px solid #c65346;border-left:3px solid #f17462;background:#72251d30}.case-verified.is-lie strong{color:#ffb8a7}.case-verified.is-lie p{color:#dbc4b5}.case-filter-note{font-size:11px!important;color:#b2aa8c!important}.case-memory-strip>span>small{font-size:9px;color:#b3a17c}
+@media(max-width:600px){.case-review.is-verified-lie{padding:14px 13px}}
 .case-modal-root .modal-head{position:sticky;top:-24px;z-index:8;background:#171b13;padding-top:10px;padding-bottom:16px}
 @media(max-width:600px){.case-modal-root .modal-head{top:-16px}}

@@ -67,7 +67,7 @@ test('all six private projections reveal only the caller card, with criminal ext
  for(const room of views){const g=room.game;assert.ok(g.self.id);assert.equal(g.secretNPC,undefined);assert.equal(g.liesUsed,undefined);assert.equal(g.guard,undefined);assert.equal(g.players.filter(x=>x.isDetective).length,1);assert.ok(room.members.every(m=>m.gameId));for(const p of g.players)assert.deepEqual(Object.keys(p).sort(),['id','isDetective','name']);clues+=g.self.clues.length;
   if(['culprit','accomplice'].includes(g.self.role)){assert.deepEqual(g.caseSecret,{suspectId:'s0',placeId:'p0'});assert.equal(g.remainingLies,2);assert.equal(g.partnerIds.length,1);}else{for(const key of ['caseSecret','remainingLies','partnerIds','sabotage'])assert.equal(g[key],undefined);}
  }
- assert.equal(clues,2);assert.notEqual(views[0].meId,views[0].game.self.id);
+ assert.equal(clues,4);assert.equal(views.find(r=>r.game.self.role==='detective').game.self.clues.length,2);assert.notEqual(views[0].meId,views[0].game.self.id);
 });
 test('server overwrites both actor and speaker IDs and rejects out-of-turn actions',async()=>{
  const f=fixture(),{tokens}=await started(f,6);let views=await Promise.all(tokens.map(t=>poll(f,t))),owner=views[0].game.turnOwnerId,wrong=views.findIndex(v=>v.game.self.id!==owner);

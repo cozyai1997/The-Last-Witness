@@ -19,14 +19,14 @@ test('exports the multiplayer API, five rounds, and original 32 NPC worlds',()=>
  assert.equal(P.MAX_ROUNDS,5);assert.equal(P.CATEGORIES.length,5);assert.equal(P.SUSPECTS.length*P.PLACES.length,32);
  assert.equal(P.ROLES.suspect.team,'investigators');assert.equal(P.ROLES.accomplice.label,'공범');
 });
-test('all 2–6 player packs have exactly the requested roles and exactly two distinct starting bits',()=>{
+test('all 2–6 player packs have requested roles, two detective hints and distinct witness starting bits',()=>{
  const P=api();
  const packs={2:['detective','culprit'],3:['detective','culprit','witness'],4:['detective','culprit','witness','suspect'],5:['detective','culprit','witness','witness','suspect'],6:['detective','culprit','witness','witness','suspect','accomplice']};
  for(let n=2;n<=6;n++)for(let seed=0;seed<20;seed++){
   const s=make(n,seed);assert.deepEqual(s.players.map(p=>p.role).sort(),packs[n].slice().sort());
   assert.deepEqual(P.ROLE_PACKS[n].slice().sort(),packs[n].slice().sort());
-  const clues=s.players.flatMap(p=>p.clues);assert.equal(clues.length,2);assert.equal(new Set(clues.map(c=>c.category)).size,2);
-  for(const p of s.players){assert.equal(p.clues.length,p.role==='detective'?(n===2?2:n<5?1:0):p.role==='witness'?1:0);for(const c of p.clues)assert.equal(c.value,categoryValue(s,c.category));}
+  const clues=s.players.flatMap(p=>p.clues),total=2+s.players.filter(p=>p.role==='witness').length;assert.equal(clues.length,total);assert.equal(new Set(clues.map(c=>c.category)).size,total);
+  for(const p of s.players){assert.equal(p.clues.length,p.role==='detective'?2:p.role==='witness'?1:0);for(const c of p.clues)assert.equal(c.value,categoryValue(s,c.category));}
   assert.equal(s.kits,1);assert.equal(s.liesUsed,0);assert.equal(s.round,1);assert.equal(s.phase,'reveal');
  }
  assert.deepEqual(make(6,9),make(6,9));assert.notDeepEqual(make(6,9).players.map(p=>p.role),make(6,10).players.map(p=>p.role));
@@ -61,7 +61,7 @@ test('public information never exposes private roles, clues, charges, secret, se
 test('secret shares are true, immutable facts; suggestions and passing do not create facts',()=>{
  const P=api();let s=reveal(make());const original=s;
  s=prepare(s,p=>p.clues.length?{kind:'share',category:p.clues[0].category}:{kind:'suggest',category:'coat'});
- assert.equal(s.facts.length,2);assert.equal(s.phase,'investigate');assert.equal(P.turnOwner(s),s.detectiveId);
+ assert.equal(s.facts.length,3);assert.equal(s.phase,'investigate');assert.equal(P.turnOwner(s),s.detectiveId);
  for(const f of s.facts){assert.equal(f.value,categoryValue(s,f.category));assert.equal(f.source,'share');assert.ok(f.speakerId);}
  assert.equal(original.facts.length,0);assert.ok(Object.isFrozen(s));assert.ok(Object.isFrozen(s.players[0].clues));assert.ok(Object.isFrozen(s.facts[0]));
  assert.throws(()=>{s.facts[0].value=1-s.facts[0].value;});assertTruthSurvives(s);
@@ -213,7 +213,7 @@ test('the browser UMD API works without require and invalid seeds or NPC options
 test('new two-player games publish both starting clues and skip only detective secret turns',()=>{
  const P=api();
  for(let seed=0;seed<12;seed++){
-  let s=make(2,seed),d=player(s,'detective'),c=player(s,'culprit');assert.equal(s.rulesVersion,2);assert.equal(s.facts.length,2);assert.equal(P.candidates(P.publicView(s)).length,8);assert.deepEqual(d.shared.slice().sort(),d.clues.map(x=>x.category).sort());
+  let s=make(2,seed),d=player(s,'detective'),c=player(s,'culprit');assert.equal(s.rulesVersion,3);assert.equal(s.facts.length,2);assert.equal(P.candidates(P.publicView(s)).length,8);assert.deepEqual(d.shared.slice().sort(),d.clues.map(x=>x.category).sort());
   s=reveal(s);assert.equal(P.turnOwner(s),c.id);assert.throws(()=>P.act(s,{type:'SECRET_ACTION',actorId:c.id,kind:'suggest',category:'coat'}));assert.throws(()=>P.act(s,{type:'SECRET_ACTION',actorId:c.id,kind:'share',category:d.clues[0].category}));
   s=P.act(s,{type:'SECRET_ACTION',actorId:c.id,kind:'pass'});assert.equal(s.phase,'investigate');s=investigate(s,{kind:'pass'});s=P.act(s,{type:'REVIEW_RESULT',actorId:d.id,kind:'confirm'});assert.equal(s.phase,'secret');assert.equal(P.turnOwner(s),c.id);assert.equal(s.review,null);
  }

@@ -29,6 +29,7 @@
   let chatOpen = false, chatReadCount = 0, privacyLocked = true, autoCueKey = '', activeStoryKey = '', modalSignature = '', ledgerReturn = false;
   let practiceCount = 4, practiceRole = 'detective', practiceSnapshot = null;
   let letterHandles = [];
+  let activeNotice = null, reviewLetterKey = '';
   const typedLetters = new Set(), Scene = window.WitnessCasePresentation;
   const U = window.WitnessCaseUI.create({ G, esc, icon, options, category, npc, place, roleLabel, playerName, truth, disabled, fieldValue, drafts, mine, chatSeen: () => chatReadCount });
   function practising() { return !!window.WitnessPractice?.active(); }
@@ -87,7 +88,7 @@
   function lobby() {
     const self = me(), allReady = room.members.length >= 2 && room.members.every(m => m.ready);
     ready = !!self?.ready;
-    return shell('<div class="online-lobby"><div class="online-section-title"><div><div class="eyebrow">THE CASE IS GATHERING</div><h1>사람들이 모이면 시작합니다.</h1></div><span class="tag">' + room.members.length + ' / ' + room.capacity + '명</span></div><div class="room-code-box"><div><small>친구에게 알려 줄 초대 코드</small><strong class="code">' + esc(room.code) + '</strong></div><button class="btn outline compact" data-action="copy-invite">' + icon('copy') + '초대 링크 복사</button></div><div class="lobby-grid"><section class="online-card"><div class="eyebrow">PLAYERS IN THE ROOM</div><h2>사건 참가자</h2><div class="lobby-members">' + room.members.map((m, i) => '<article class="lobby-member ' + (m.id === room.meId ? 'me' : '') + '"><div class="member-avatar">' + (i + 1) + '</div><div><div class="member-name">' + esc(m.name) + '</div><div class="member-meta">' + (m.id === room.hostId ? '<span class="tag">방장</span>' : '') + (m.id === room.meId ? '<span class="tag">나</span>' : '') + '<span class="member-online ' + (m.online ? '' : 'offline') + '" data-member-online="' + esc(m.id) + '">' + (m.online ? '접속 중' : '잠시 연결 끊김') + '</span></div></div><span class="member-ready ' + (m.ready ? '' : 'no') + '">' + (m.ready ? '준비 완료' : '준비 중') + '</span>' + (isHost() && m.id !== room.meId ? '<button class="kick-button" data-action="kick" data-id="' + esc(m.id) + '" aria-label="' + esc(m.name) + '님 내보내기">내보내기</button>' : '') + '</article>').join('') + Array.from({ length: Math.max(0, room.capacity - room.members.length) }, () => '<div class="lobby-empty">초대 링크로 다른 참가자가 입장할 수 있습니다.</div>').join('') + '</div><div class="lobby-actions"><button class="btn ' + (ready ? 'outline' : 'primary') + '" data-action="ready" data-mutate' + disabled(false) + '>' + (ready ? '준비 취소' : '준비 완료') + '</button>' + (isHost() ? '<button class="btn primary" data-action="start" data-mutate' + disabled(!allReady) + '>역할 배분 · 사건 시작 ' + icon('arrow') + '</button>' : '') + '</div><div class="case-ready-banner ' + (allReady ? 'is-ready' : '') + '" role="status"><span class="case-spinner" aria-hidden="true"></span><div>' + (isHost() ? (allReady ? '모두 준비했습니다. 방장이 사건을 시작할 수 있습니다.' : '방장을 포함해 현재 참가자 모두 준비해야 시작할 수 있습니다.') : '준비 완료를 누르고 방장의 시작을 기다려 주세요.') + '<small>현재 인원으로 역할이 배분됩니다. 방이 꽉 차지 않아도 두 명 이상이면 시작할 수 있습니다.</small></div></div></section><aside class="online-card"><div class="eyebrow">BEFORE WE BEGIN</div><h2>같은 사건, 서로 다른 비밀.</h2><div class="role-art" data-role="sealed" aria-hidden="true" style="max-width:210px;margin:20px auto"></div><p>탐정의 신원은 모두에게 공개됩니다. 다른 역할과 개인 단서는 각자의 화면에서만 확인합니다.</p><p>수사 진영의 시작 단서는 합계 두 개입니다. 인원이 늘어나도 공동 수사는 매 라운드 한 번, 감식 키트는 합계 한 개입니다.</p><button class="text-button" data-action="rules">온라인 방법과 전체 규칙 ' + icon('arrow') + '</button></aside></div></div>');
+    return shell('<div class="online-lobby"><div class="online-section-title"><div><div class="eyebrow">THE CASE IS GATHERING</div><h1>사람들이 모이면 시작합니다.</h1></div><span class="tag">' + room.members.length + ' / ' + room.capacity + '명</span></div><div class="room-code-box"><div><small>친구에게 알려 줄 초대 코드</small><strong class="code">' + esc(room.code) + '</strong></div><button class="btn outline compact" data-action="copy-invite">' + icon('copy') + '초대 링크 복사</button></div><div class="lobby-grid"><section class="online-card"><div class="eyebrow">PLAYERS IN THE ROOM</div><h2>사건 참가자</h2><div class="lobby-members">' + room.members.map((m, i) => '<article class="lobby-member ' + (m.id === room.meId ? 'me' : '') + '"><div class="member-avatar">' + (i + 1) + '</div><div><div class="member-name">' + esc(m.name) + '</div><div class="member-meta">' + (m.id === room.hostId ? '<span class="tag">방장</span>' : '') + (m.id === room.meId ? '<span class="tag">나</span>' : '') + '<span class="member-online ' + (m.online ? '' : 'offline') + '" data-member-online="' + esc(m.id) + '">' + (m.online ? '접속 중' : '잠시 연결 끊김') + '</span></div></div><span class="member-ready ' + (m.ready ? '' : 'no') + '">' + (m.ready ? '준비 완료' : '준비 중') + '</span>' + (isHost() && m.id !== room.meId ? '<button class="kick-button" data-action="kick" data-id="' + esc(m.id) + '" aria-label="' + esc(m.name) + '님 내보내기">내보내기</button>' : '') + '</article>').join('') + Array.from({ length: Math.max(0, room.capacity - room.members.length) }, () => '<div class="lobby-empty">초대 링크로 다른 참가자가 입장할 수 있습니다.</div>').join('') + '</div><div class="lobby-actions"><button class="btn ' + (ready ? 'outline' : 'primary') + '" data-action="ready" data-mutate' + disabled(false) + '>' + (ready ? '준비 취소' : '준비 완료') + '</button>' + (isHost() ? '<button class="btn primary" data-action="start" data-mutate' + disabled(!allReady) + '>역할 배분 · 사건 시작 ' + icon('arrow') + '</button>' : '') + '</div><div class="case-ready-banner ' + (allReady ? 'is-ready' : '') + '" role="status"><span class="case-spinner" aria-hidden="true"></span><div>' + (isHost() ? (allReady ? '모두 준비했습니다. 방장이 사건을 시작할 수 있습니다.' : '방장을 포함해 현재 참가자 모두 준비해야 시작할 수 있습니다.') : '준비 완료를 누르고 방장의 시작을 기다려 주세요.') + '<small>현재 인원으로 역할이 배분됩니다. 방이 꽉 차지 않아도 두 명 이상이면 시작할 수 있습니다.</small></div></div></section><aside class="online-card"><div class="eyebrow">BEFORE WE BEGIN</div><h2>같은 사건, 서로 다른 비밀.</h2><div class="role-art" data-role="sealed" aria-hidden="true" style="max-width:210px;margin:20px auto"></div><p>탐정의 신원은 모두에게 공개됩니다. 다른 역할과 개인 단서는 각자의 화면에서만 확인합니다.</p><p>탐정은 인물 힌트 한 개와 현장 힌트 한 개, 목격자는 단서를 한 개씩 받습니다. 공동 수사는 매 라운드 한 번, 감식 키트는 합계 한 개입니다.</p><button class="text-button" data-action="rules">온라인 방법과 전체 규칙 ' + icon('arrow') + '</button></aside></div></div>');
   }
 
   function roster(g) {
@@ -136,13 +137,13 @@
   function updatePresence() { if (!room) return; room.members.forEach(m => document.querySelectorAll('[data-member-online="' + m.id + '"]').forEach(el => { const chip = el.closest('.online-seat'); el.textContent = chip ? (m.online ? '●' : '○') : (m.online ? '접속 중' : '잠시 연결 끊김'); el.classList.toggle('offline', !m.online); })); }
   function acceptRoom(nextRoom, force = false) {
     if (room && nextRoom && room.code === nextRoom.code && nextRoom.revision < room.revision) return;
-    const old = room, changedRoom = (old?.code || null) !== (nextRoom?.code || null);
+    const old = room, changedRoom = (old?.code || null) !== (nextRoom?.code || null) || (old?.caseId || null) !== (nextRoom?.caseId || null);
     const phaseChanged = old?.game?.phase !== nextRoom?.game?.phase || old?.game?.turnOwnerId !== nextRoom?.game?.turnOwnerId || old?.game?.round !== nextRoom?.game?.round;
     const changed = changedRoom || old?.revision !== nextRoom?.revision || old?.status !== nextRoom?.status || phaseChanged;
     room = nextRoom;
     const resetDrafts = changedRoom || old?.status === 'finished' && nextRoom?.status === 'lobby';
     if (resetDrafts) { Scene?.cancel(); activeStoryKey = ''; autoCueKey = ''; privacyLocked = true; privateVisible = false; marksS.clear(); marksP.clear(); Object.keys(drafts).forEach(k => { if (!['nickname', 'joinCode'].includes(k)) delete drafts[k]; }); closeModal(); }
-    if (phaseChanged) { privateVisible = false; if (modalKind && !['register', 'logout'].includes(modalKind)) closeModal(); }
+    if (phaseChanged) { privateVisible = false; if (modalKind && !activeNotice && !['register', 'logout'].includes(modalKind)) closeModal(); }
     if (room?.status === 'finished') privateVisible = false;
     if (changed || force) render(resetDrafts); else { updatePresence(); updateConnection(); }
     if (changed || force) pumpCaseCues();
@@ -223,7 +224,7 @@
   }
   function clearPasswordFields() { ['password', 'password-confirm'].forEach(id => { const input = document.getElementById(id); if (input) input.value = ''; }); }
   function updateAuthError() { document.querySelectorAll('[data-auth-error]').forEach(el => { el.textContent = authError; el.hidden = !authError; }); }
-  function closeModal() { letterHandles.forEach(h => h.cancel?.()); letterHandles = []; modalSignature = ''; clearPasswordFields(); modalHost.innerHTML = ''; modalKind = null; document.body.style.overflow = ''; if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true }); }
+  function closeModal() { activeNotice?.handle?.cancel?.(); activeNotice = null; reviewLetterKey = ''; letterHandles.forEach(h => h.cancel?.()); letterHandles = []; modalSignature = ''; clearPasswordFields(); modalHost.innerHTML = ''; modalKind = null; document.body.style.overflow = ''; if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true }); }
   function upgradeModal() {
     if (!token || account) return;
     privateVisible = false; authError = ''; render();
@@ -260,9 +261,13 @@
   }
   function settings() { openModal('settings', '분위기 조절', '<p class="small subtle">원본 누아르 이미지 위로 연기·먼지·잔불이 움직입니다. 배경음악은 오른쪽 아래에서 따로 조절하세요.</p><div class="fx-settings"><label class="check-label">효과 품질 <select id="quality" data-change="quality">' + [['high', '고품질'], ['low', '저사양'], ['off', '끔']].map(([value, text]) => '<option value="' + value + '"' + (quality === value ? ' selected' : '') + '>' + text + '</option>').join('') + '</select></label><label class="check-label"><input type="checkbox" data-change="gore"' + (gore ? ' checked' : '') + '> 혈흔 오버레이</label></div><p class="online-footer-note">혈흔 오버레이를 꺼도 생성 배경에 그려진 사건 흔적은 남습니다.</p>'); }
   function applyFX() { document.body.classList.toggle('gore-off', !gore); document.body.classList.toggle('fx-off', quality === 'off'); document.body.classList.toggle('fx-high', quality === 'high'); FX?.setQuality?.(quality); }
-  function privacy() { privacyLocked = true; if (privateVisible) { privateVisible = false; render(); } }
+  function privacy() { privacyLocked = true; if (activeNotice && game()?.self.role === 'culprit') closeModal(); if (privateVisible) { privateVisible = false; render(); } }
   function ledger() { ledgerReturn = ['personal', 'review'].includes(modalKind); const g = game(), possible = G.candidates(g); openModal('ledger', '공식 기록과 후보 조합', '<div class="rules-content"><h3>공식 증거 · 항상 진실</h3>' + factsHTML(g) + '<h3>공식 진술 · 거짓은 합계 최대 2회</h3>' + claimsHTML(g) + '<h3>공개 기록 기준 후보 ' + possible.length + '개</h3><div class="candidate-list">' + possible.map(c => '<span class="tag">' + npc(c.suspectId).name + ' / ' + place(c.placeId).name + '</span>').join('') + '</div><p class="online-footer-note">개인 화면에만 있는 단서와 자유 발언, 내 제외 메모는 후보 계산에 넣지 않습니다.</p><h3>진행 기록</h3>' + g.log.map(l => '<p class="small subtle">R' + l.round + ' · ' + esc(l.text) + '</p>').join('') + '</div>'); }
-  function accuseModal() { const g = game(); if (!g || g.self.role !== 'detective' || !(g.phase === 'final' || g.phase === 'discussion' || g.phase === 'investigate' && g.round < 5)) return; openModal('accuse', '탐정의 최종 고발', '<p class="small subtle">사건 인물 한 명과 장소 한 곳을 고릅니다. 하나라도 틀리면 범인 진영이 승리하며 고발은 한 번뿐입니다.</p><div class="form-grid"><label class="field"><span>사건 인물 · 참가자 역할과 별개</span><select id="accuse-person" data-change="accuse"><option value="">선택하세요</option>' + options(G.SUSPECTS) + '</select></label><label class="field"><span>범행 장소</span><select id="accuse-place" data-change="accuse"><option value="">선택하세요</option>' + options(G.PLACES) + '</select></label></div><div class="notice">확정하면 진상과 모든 역할이 모두에게 공개됩니다.</div><div class="modal-actions"><button class="btn outline" data-action="close-modal">기록 더 보기</button><button class="btn danger" id="confirm-accuse" data-action="confirm-accuse" data-mutate disabled>최종 고발 확정</button></div>'); }
+  function accuseModal() {
+    const g = game(); if (!g || g.self.role !== 'detective' || !(g.phase === 'final' || g.phase === 'discussion' || g.phase === 'investigate' && g.round < 5)) return;
+    const possible = window.WitnessDetectiveOptions.accusationCandidates(g), suspects = possible.suspects.filter(s => !marksS.has(s.id)), places = possible.places.filter(p => !marksP.has(p.id));
+    openModal('accuse', '탐정의 최종 고발', '<p class="small subtle">공식 증거와 나의 참 단서, 내 제외 메모를 반영한 후보만 표시합니다. 인물과 장소 중 하나라도 틀리면 범인 진영이 승리하며 고발은 한 번뿐입니다.</p><div class="form-grid"><label class="field"><span>사건 인물 · 참가자 역할과 별개</span><select id="accuse-person" data-change="accuse"><option value="">선택하세요</option>' + options(suspects) + '</select></label><label class="field"><span>범행 장소</span><select id="accuse-place" data-change="accuse"><option value="">선택하세요</option>' + options(places) + '</select></label></div>' + (!suspects.length || !places.length ? '<div class="notice">내 제외 메모 때문에 선택할 후보가 없습니다. 메모를 다시 검토하거나 초기화하세요.<button class="text-button" data-action="clear-marks">내 제외 메모 초기화</button></div>' : '') + '<div class="notice">내 제외 메모는 나의 판단이며 확정 증거가 아닙니다. 확정하면 진상과 모든 역할이 모두에게 공개됩니다.</div><div class="modal-actions"><button class="btn outline" data-action="close-modal">기록 더 보기</button><button class="btn danger" id="confirm-accuse" data-action="confirm-accuse" data-mutate disabled>최종 고발 확정</button></div>');
+  }
   async function engineAction(event) { return mutate('action', { event }); }
   async function copyInvite() { const url = new URL(window.location.origin + window.location.pathname); url.searchParams.set('room', room.code); try { await navigator.clipboard.writeText(url.href); toast('초대 링크를 복사했습니다. 친구에게 전달하세요.'); } catch (_) { openModal('invite', '초대 링크를 복사해 주세요', '<p class="small subtle">아래 주소를 선택해 친구에게 전달하세요.</p><input class="invite-copy" id="invite-link" readonly value="' + esc(url.href) + '">'); $('#invite-link')?.select(); } }
 
@@ -270,17 +275,33 @@
   function turnCueKey(g) { return caseId() + ':' + g.round + ':' + g.phase + ':' + g.turnOwnerId; }
   function animateLetters() {
     if (!Scene?.type) return;
+    const reviewing = modalKind === 'review', letterKey = reviewing ? caseId() + ':' + game()?.round + ':' + JSON.stringify(game()?.review) : '';
+    if (reviewing) reviewLetterKey = letterKey;
+    const handles = [];
     modalHost.querySelectorAll('[data-handwritten]').forEach(el => {
       const text = el.dataset.text || el.textContent, key = caseId() + ':' + game()?.round + ':' + text;
       if (typedLetters.has(key)) return;
-      typedLetters.add(key); letterHandles.push(Scene.type(el, text, { speed: 24 }));
+      const handle = Scene.type(el, text, { speed: 24 }); letterHandles.push(handle); handles.push(handle);
+      Promise.resolve(handle.promise).then(result => { if (!result?.cancelled) typedLetters.add(key); });
     });
+    if (reviewing && handles.some(h => !h.done)) {
+      modalHost.querySelectorAll('[data-action="review-confirm"],[data-action="review-audit"]').forEach(b => { b.disabled = true; });
+      const actions = modalHost.querySelector('.case-review-actions');
+      if (actions) actions.innerHTML = '<button class="btn outline" data-action="letter-finish">빠르게 보기</button>' + actions.innerHTML;
+      Promise.all(handles.map(h => h.promise)).then(results => {
+        if (results.some(r => r?.cancelled) || modalKind !== 'review' || reviewLetterKey !== letterKey) return;
+        if (caseId() + ':' + game()?.round + ':' + JSON.stringify(game()?.review) !== letterKey) { refreshCaseModal(true); return; }
+        modalHost.querySelectorAll('[data-action="review-confirm"],[data-action="review-audit"]').forEach(b => { b.disabled = pending || b.dataset.action === 'review-audit' && !game()?.kits; });
+        const fast = modalHost.querySelector('[data-action="letter-finish"]'); if (fast) fast.hidden = true;
+      });
+    }
   }
   function refreshCaseModal(force = false) {
     const g = game();
     if (!g || !['personal', 'review'].includes(modalKind)) return;
     const next = JSON.stringify([modalKind, privateVisible, pending, tab, g.phase, g.round, g.turnOwnerId, g.self, g.caseSecret, g.kits, g.remainingLies, g.sabotage, g.pending, g.review, g.facts, g.statements, drafts.questionCategory, drafts.questionTarget, drafts.questionProposed]);
     if (!force && next === modalSignature) return;
+    if (modalKind === 'review' && letterHandles.some(h => !h.done)) return;
     modalSignature = next;
     letterHandles.forEach(h => h.cancel?.()); letterHandles = [];
     const host = $('#case-window-body');
@@ -299,16 +320,12 @@
     modalSignature = ''; refreshCaseModal();
   }
   function openTurnCue() {
-    const g = game(); if (!g || document.hidden || Scene?.busy()) return;
+    const g = game(); if (!g || document.hidden || activeNotice || Scene?.busy()) return;
     if (modalKind && !['personal', 'review', 'obstruction'].includes(modalKind)) return;
     const key = turnCueKey(g), initialKey = caseId() + ':personal-opened';
     if (g.phase === 'finished') return;
     if (!sessionGet(initialKey)) {
       sessionSet(initialKey, '1'); autoCueKey = key; privateVisible = false; openPersonal(); return;
-    }
-    if (g.review?.kind === 'blocked' && g.self.role !== 'culprit' && g.self.role !== 'detective') {
-      const noticeKey = caseId() + ':blocked:' + g.round;
-      if (!sessionGet(noticeKey)) { sessionSet(noticeKey, '1'); openModal('obstruction', '누군가 기록에 손을 댔습니다.', '<p class="case-hand" data-handwritten data-text="기록의 일부가 지워져, 오늘 이 항목의 수사를 진행할 수 없습니다. 이미 확보한 증거는 그대로 남아 있습니다.">기록의 일부가 지워져, 오늘 이 항목의 수사를 진행할 수 없습니다. 이미 확보한 증거는 그대로 남아 있습니다.</p><button class="btn outline" data-action="close-modal">확인</button>'); animateLetters(); return; }
     }
     if (!mine(g) || key === autoCueKey) return;
     autoCueKey = key;
@@ -317,6 +334,8 @@
   }
   function pumpCaseCues() {
     const g = game(); if (!g || document.hidden || room.status === 'lobby') return;
+    if (activeNotice || Scene?.busy()) return;
+    if (showCaseNotice(g)) return;
     const stage = g.phase === 'finished' ? 'ending' : g.phase === 'final' ? 'final' : g.round === 1 ? 'start' : 'round';
     const key = caseId() + ':story:' + stage + ':' + g.round;
     if (!sessionGet(key) && Scene?.showStory) {
@@ -324,11 +343,41 @@
       if (modalKind && !['personal', 'review', 'obstruction'].includes(modalKind)) return;
       Scene.cancel(); closeModal(); activeStoryKey = key; sessionSet(key, '1');
       const expectedCase = caseId();
-      const show = () => { if (caseId() !== expectedCase) return; Scene.showStory({ key, day: g.round, stage, winner: g.winner, suspectName: g.reveal ? npc(g.reveal.secret.suspectId).name : undefined, placeName: g.reveal ? place(g.reveal.secret.placeId).name : undefined, onDone: () => { if (caseId() !== expectedCase) return; activeStoryKey = ''; openTurnCue(); } }); };
+      const show = () => { if (caseId() !== expectedCase) return; Scene.showStory({ key, day: g.round, stage, winner: g.winner, suspectName: g.reveal ? npc(g.reveal.secret.suspectId).name : undefined, placeName: g.reveal ? place(g.reveal.secret.placeId).name : undefined, onDone: () => { if (caseId() !== expectedCase) return; activeStoryKey = ''; pumpCaseCues(); } }); };
       if (stage === 'round' && Scene.showDay) Scene.showDay(g.round, { onDone: show }); else show();
       return;
     }
     if (!Scene?.busy()) openTurnCue();
+  }
+  function showCaseNotice(g) {
+    const notices = [], culprit = g.self.role === 'culprit';
+    if (culprit) {
+      const outcomes = g.self.sealOutcomes?.length ? g.self.sealOutcomes : g.self.sealOutcome ? [g.self.sealOutcome] : [];
+      outcomes.forEach(o => { if (Number.isInteger(o.round) && typeof o.success === 'boolean') notices.push({ key: caseId() + ':seal:' + o.round, title: o.success ? '은폐가 성공했습니다.' : '은폐가 실패했습니다.', text: o.success ? '당신이 감춘 기록 앞에서 수사가 멈췄습니다. 오늘의 은폐는 성공했습니다. 이미 공개된 증거는 바뀌지 않습니다.' : '감춘 기록이 오늘의 수사를 막지 못했습니다. 은폐에 쓴 기회는 되돌아오지 않습니다. 다음 선택을 준비하세요.' }); });
+    } else if (g.self.role !== 'detective') {
+      const rounds = new Set((g.questionHistory || []).filter(q => q.status === 'blocked').map(q => q.round));
+      if (g.review?.kind === 'blocked') rounds.add(g.review.round || g.round);
+      rounds.forEach(day => notices.push({ key: caseId() + ':blocked:' + day, title: '누군가 기록에 손을 댔습니다.', text: '기록의 일부가 지워져, 오늘 이 항목의 수사를 진행할 수 없습니다. 이미 확보한 증거는 그대로 남아 있습니다.' }));
+    }
+    const notice = notices.find(n => !sessionGet(n.key)); if (!notice) return false;
+    if (modalKind && !['personal', 'review', 'obstruction'].includes(modalKind)) return false;
+    closeModal();
+    openModal('obstruction', notice.title, '<p class="case-letter-label">DAY-' + String(Number(notice.key.split(':').at(-1))).padStart(2, '0') + ' / ' + (culprit ? 'PRIVATE RECORD' : 'CASE RECORD') + '</p><p class="case-hand" id="case-notice-text"></p><div class="case-review-actions"><button class="btn outline" data-action="notice-finish">빠르게 보기</button><button class="btn primary" data-action="notice-continue" disabled>계속</button></div>');
+    const current = { ...notice, case: caseId(), ready: false, handle: null }; activeNotice = current;
+    const element = $('#case-notice-text');
+    const done = result => {
+      if (result?.cancelled || activeNotice !== current || current.case !== caseId()) return;
+      current.ready = true; const next = modalHost.querySelector('[data-action="notice-continue"]'); if (next) next.disabled = false;
+      const fast = modalHost.querySelector('[data-action="notice-finish"]'); if (fast) fast.hidden = true;
+    };
+    if (Scene?.type) { current.handle = Scene.type(element, notice.text, { speed: 24 }); Promise.resolve(current.handle.promise).then(done); }
+    else { element.textContent = notice.text; done({ cancelled: false }); }
+    return true;
+  }
+  function finishNotice() {
+    if (!activeNotice) return;
+    if (!activeNotice.ready) { activeNotice.handle?.finish?.(); return; }
+    sessionSet(activeNotice.key, '1'); closeModal(); pumpCaseCues();
   }
   function practiceSetup() {
     openModal('practice', '컴퓨터와 사건 연습', '<div class="case-practice-options"><p class="case-practice-note">로그인 없이 실제 규칙으로 연습합니다. 나를 제외한 참가자는 컴퓨터가 맡습니다. 연습 상태는 이 탭에서만 유지됩니다.</p><div><h3>나를 포함한 참가 인원</h3><div class="count-options">' + [2,3,4,5,6].map(n => '<button class="count-button ' + (practiceCount === n ? 'selected' : '') + '" data-action="practice-count" data-count="' + n + '" aria-pressed="' + (practiceCount === n) + '">' + n + '명</button>').join('') + '</div></div><div><h3>나의 역할</h3><div class="case-practice-role">' + [['detective','탐정'],['culprit','범인'],['random','무작위']].map(([id,label]) => '<button class="' + (practiceRole === id ? 'selected' : '') + '" data-action="practice-role" data-role="' + id + '" aria-pressed="' + (practiceRole === id) + '">' + label + '</button>').join('') + '</div></div><button class="btn primary full" data-action="practice-start">연습 사건 시작 ' + icon('arrow') + '</button></div>');
@@ -348,7 +397,11 @@
   }
 
   async function act(action, button) {
+    if (activeNotice && !['notice-finish', 'notice-continue', 'chat-toggle', 'send-note', 'refresh', 'practice-exit', 'logout-confirm', 'restart', 'leave-confirm'].includes(action)) { if (action === 'close-modal') finishNotice(); return; }
     const d = button?.dataset || {};
+    if (action === 'notice-finish') { activeNotice?.handle?.finish?.(); return; }
+    if (action === 'notice-continue') { if (activeNotice?.ready) finishNotice(); return; }
+    if (action === 'letter-finish') { letterHandles.forEach(h => h.finish?.()); return; }
     if (action === 'scroll-login') { $('#online-setup')?.scrollIntoView({ behavior: quality === 'off' ? 'auto' : 'smooth', block: 'center' }); $('#nickname')?.focus({ preventScroll: true }); }
     else if (action === 'auth-mode') { if (!pending) { clearPasswordFields(); authMode = d.mode === 'register' ? 'register' : 'login'; authError = ''; render(); } }
     else if (action === 'login') await submitAuth('login');
@@ -373,8 +426,8 @@
     else if (action === 'private-show') { privacyLocked = false; privateVisible = true; openPersonal(); }
     else if (action === 'resource-help') { const host = button.closest('.case-resource'); const open = button.getAttribute('aria-expanded') !== 'true'; button.setAttribute('aria-expanded', String(open)); host?.classList.toggle('is-open', open); }
     else if (action === 'review-open') openReview();
-    else if (action === 'review-audit') await engineAction({ type: 'REVIEW_RESULT', kind: 'audit' });
-    else if (action === 'review-confirm') { const g = game(); if (g?.review) await engineAction({ type: 'REVIEW_RESULT', kind: 'confirm' }); else if (g?.round < 5) await engineAction({ type: 'END_ROUND' }); else accuseModal(); }
+    else if (action === 'review-audit') { if (!letterHandles.some(h => !h.done)) await engineAction({ type: 'REVIEW_RESULT', kind: 'audit' }); }
+    else if (action === 'review-confirm') { if (letterHandles.some(h => !h.done)) return; const g = game(); if (g?.review) await engineAction({ type: 'REVIEW_RESULT', kind: 'confirm' }); else if (g?.round < 5) await engineAction({ type: 'END_ROUND' }); else accuseModal(); }
     else if (action === 'chat-toggle') { chatOpen = !chatOpen; if (chatOpen) chatReadCount = game()?.notes.length || 0; render(); }
     else if (action === 'practice-setup') practiceSetup();
     else if (action === 'practice-count') { practiceCount = Number(d.count); practiceSetup(); }
@@ -389,18 +442,18 @@
     else if (action === 'secret-pass') await engineAction({ type: 'SECRET_ACTION', kind: 'pass' });
     else if (action === 'answer') await engineAction({ type: 'ANSWER', value: d.value === 'unknown' ? null : Number(d.value) });
     else if (action === 'tab') { captureDrafts(); tab = d.id; refreshCaseModal(true); }
-    else if (action === 'question') await engineAction({ type: 'INVESTIGATE', kind: 'question', targetId: $('#question-target').value, category: $('#question-category').value, proposedValue: Number($('#question-proposed')?.value || 0) });
+    else if (action === 'question') { const selected = window.WitnessDetectiveOptions.questionSelection(game(), { category: $('#question-category')?.value, proposedValue: $('#question-proposed')?.value }); if (!selected.category) { toast('새로 질문할 항목이 없습니다. 기록을 검증하거나 수사를 넘겨 주세요.'); return; } await engineAction({ type: 'INVESTIGATE', kind: 'question', targetId: $('#question-target')?.value, category: selected.category, proposedValue: selected.proposedValue }); }
     else if (action === 'search') await engineAction({ type: 'INVESTIGATE', kind: 'search', category: d.category });
     else if (action === 'audit') await engineAction({ type: 'INVESTIGATE', kind: 'audit', statementId: d.id });
     else if (action === 'skip') openModal('skip', '이번 수사를 넘길까요?', '<p class="small subtle">공동 수사 없이 이번 라운드의 토론으로 넘어갑니다.</p><div class="modal-actions"><button class="btn outline" data-action="close-modal">수사 계속</button><button class="btn danger" data-action="skip-confirm" data-mutate>이번 수사 넘기기</button></div>');
     else if (action === 'skip-confirm') { closeModal(); await engineAction({ type: 'INVESTIGATE', kind: 'pass' }); }
     else if (action === 'mark-s' || action === 'mark-p') { const set = action === 'mark-s' ? marksS : marksP; set.has(d.id) ? set.delete(d.id) : set.add(d.id); render(); }
-    else if (action === 'clear-marks') { marksS.clear(); marksP.clear(); render(); }
+    else if (action === 'clear-marks') { marksS.clear(); marksP.clear(); render(); if (modalKind === 'accuse') accuseModal(); }
     else if (action === 'ledger') ledger();
     else if (action === 'send-note') { const text = ($('#chat-text')?.value || '').trim(); if (!text) { toast('자유 발언을 입력해 주세요.'); return; } const data = await mutate('action', { event: { type: 'ADD_NOTE', text } }); if (data) { drafts.chat = ''; const input = $('#chat-text'); if (input) input.value = ''; render(); } }
     else if (action === 'end-round') await engineAction({ type: 'END_ROUND' });
     else if (action === 'accuse') accuseModal();
-    else if (action === 'confirm-accuse') { const suspectId = $('#accuse-person')?.value, placeId = $('#accuse-place')?.value; if (suspectId && placeId) { const data = await engineAction({ type: 'ACCUSE', suspectId, placeId }); if (data) closeModal(); } }
+    else if (action === 'confirm-accuse') { const suspectId = $('#accuse-person')?.value, placeId = $('#accuse-place')?.value, possible = window.WitnessDetectiveOptions.accusationCandidates(game()); if (possible.suspects.some(s => s.id === suspectId && !marksS.has(s.id)) && possible.places.some(p => p.id === placeId && !marksP.has(p.id))) { const data = await engineAction({ type: 'ACCUSE', suspectId, placeId }); if (data) closeModal(); } }
     else if (action === 'restart') { const data = await mutate('restart'); if (data) { privateVisible = false; marksS.clear(); marksP.clear(); render(); } }
     else if (action === 'leave' && practising()) await stopPractice();
     else if (action === 'leave') openModal('leave', '이 방에서 나갈까요?', '<p class="small subtle">' + (room?.status === 'playing' ? '진행 중인 사건에서 나갑니다. 다른 참가자의 진행에도 영향을 줄 수 있습니다.' : '다시 참여하려면 초대 코드가 필요합니다.') + '</p><div class="modal-actions"><button class="btn outline" data-action="close-modal">머무르기</button><button class="btn danger" data-action="leave-confirm" data-mutate>방 나가기</button></div>');
@@ -413,7 +466,7 @@
   document.addEventListener('input', event => { if (event.target.dataset.draft && event.target.type !== 'password' && !/password/i.test(event.target.dataset.draft)) drafts[event.target.dataset.draft] = event.target.value; });
   document.addEventListener('change', event => { const el = event.target; if (el.dataset.draft && el.type !== 'password' && !/password/i.test(el.dataset.draft)) drafts[el.dataset.draft] = el.value; if (el.dataset.change === 'quality') { quality = el.value; applyFX(); } else if (el.dataset.change === 'gore') { gore = el.checked; applyFX(); } else if (el.id === 'question-category' || el.id === 'question-target' || el.id === 'question-proposed') { captureDrafts(); refreshCaseModal(true); } else if (el.dataset.change === 'accuse') { const button = $('#confirm-accuse'); if (button) button.disabled = pending || !$('#accuse-person').value || !$('#accuse-place').value; } });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') { if (Scene?.busy()) return; if (modalKind) { ledgerReturn = false; closeModal(); } privacy(); }
+    if (event.key === 'Escape') { if (Scene?.busy()) return; if (activeNotice) { event.preventDefault(); finishNotice(); return; } if (modalKind) { ledgerReturn = false; closeModal(); } privacy(); }
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && event.target.id === 'chat-text') { event.preventDefault(); act('send-note'); }
     else if (event.key === 'Enter' && ['nickname', 'password', 'password-confirm'].includes(event.target.id)) { event.preventDefault(); act(modalKind === 'register' ? 'upgrade-submit' : authMode === 'register' ? 'register' : 'login'); }
     else if (event.key === 'Enter' && event.target.id === 'join-code') { event.preventDefault(); act('join'); }

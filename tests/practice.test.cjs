@@ -42,7 +42,7 @@ function valueOf(world, category) {
 }
 function humanEvent(view) {
   if (view.phase === 'reveal') return { type: 'ROLE_SEEN' };
-  if (view.phase === 'secret') { const clue = view.self.clues.find(c => !view.self.shared.includes(c.category)); return clue && !(view.rulesVersion === 2 && view.players.length === 2) ? { type: 'SECRET_ACTION', kind: 'share', category: clue.category } : { type: 'SECRET_ACTION', kind: 'pass' }; }
+  if (view.phase === 'secret') { const clue = view.self.clues.find(c => !view.self.shared.includes(c.category)); return clue && !(view.rulesVersion >= 2 && view.players.length === 2) ? { type: 'SECRET_ACTION', kind: 'share', category: clue.category } : { type: 'SECRET_ACTION', kind: 'pass' }; }
   if (view.phase === 'investigate') {
     const pool = E.candidates(view), category = E.CATEGORIES.find(c => !view.facts.some(f => f.category === c.id))?.id;
     if (pool.length < 2 || !category) return { type: 'INVESTIGATE', kind: 'pass' };
@@ -123,4 +123,25 @@ test('local practice: validation and lazy loading leave online identity untouche
   const h = harness(); assert.equal(h.scripts.length, 0); assert.equal(h.api.active(), false);
   for (const options of [{ count: 1 }, { count: 7 }, { role: 'admin' }, { seed: -1 }, { seed: 1.5 }, { name: 'x'.repeat(21) }]) await assert.rejects(() => h.api.start(options));
   assert.equal(h.scripts.length, 0); assert.deepEqual(h.counts(), { apiCalls: 0, storageCalls: 0 }); assert.equal(h.context.WitnessParty, h.onlineCatalog);
+});
+
+test('local practice: only the culprit receives a settled failed seal outcome', async t => {
+  const h = harness(); t.after(() => h.api.stop());
+  let result = await h.api.start({ count: 2, role: 'culprit', seed: 17 });
+  while (result.room.game.phase === 'reveal') {
+    if (result.room.game.turnOwnerId === result.room.game.self.id) result = await h.api.request({ op: 'action', event: { type: 'ROLE_SEEN' } });
+    else { h.nextBot(); result = await h.api.request({ op: 'poll' }); }
+  }
+  assert.equal(result.room.game.phase, 'secret');
+  const initial = E.makeGame(['a', 'b'], { seed: 17 });
+  const known = initial.players.find(p => p.role === 'detective').clues[0].category;
+  result = await h.api.request({ op: 'action', event: { type: 'SECRET_ACTION', kind: 'seal', category: known } });
+  assert.equal(result.room.game.self.sealOutcome, undefined, 'a prepared seal has no premature outcome');
+  h.nextBot(); result = await h.api.request({ op: 'poll' });
+  if (result.room.game.phase === 'answer') result = await h.api.request({ op: 'action', event: { type: 'ANSWER', value: valueOf(result.room.game.caseSecret, result.room.game.pending.category) } });
+  assert.equal(result.room.game.phase, 'discussion');
+  assert.equal(result.room.game.self.sealOutcome?.round, 1);
+  assert.equal(result.room.game.self.sealOutcome?.success, false);
+  assert.ok(['missed', 'unused'].includes(result.room.game.self.sealOutcome?.reason));
+  assert.equal(result.room.game.self.sealOutcomes.length, 1);
 });

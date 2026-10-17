@@ -26,14 +26,17 @@ function actual(secret,cat){const order=['coat','hand','item','zone','light'].in
  await request({op:'start',token:tokens[1],revision:room.revision,requestId:crypto.randomUUID()},403);
  for(let i=0;i<6;i++)await mutate(i,'ready',{ready:true});
  room=await mutate(0,'start');
- assert.equal(room.game.rulesVersion,2);assert.match(room.caseId,/^[0-9a-f-]{36}$/);const firstCaseId=room.caseId;
+ assert.equal(room.game.rulesVersion,3);assert.match(room.caseId,/^[0-9a-f-]{36}$/);const firstCaseId=room.caseId;
  const views=await Promise.all(tokens.slice(0,6).map((_,i)=>poll(i)));
  const engineIds=views.map(v=>v.game.self.id);
  const roles=views.map(v=>v.game.self.role);
  assert.deepEqual([...roles].sort(),['detective','culprit','witness','witness','suspect','accomplice'].sort());
  const criminal=roles.indexOf('culprit'),accomplice=roles.indexOf('accomplice'),suspect=roles.indexOf('suspect'),detective=roles.indexOf('detective');
+ const detectiveClues=views[detective].game.self.clues;
+ assert.equal(detectiveClues.length,2);assert.equal(detectiveClues.filter(c=>['coat','hand','item'].includes(c.category)).length,1);assert.equal(detectiveClues.filter(c=>['zone','light'].includes(c.category)).length,1);
+ assert.equal(views.reduce((total,v)=>total+v.game.self.clues.length,0),4);assert.equal(new Set(views.flatMap(v=>v.game.self.clues.map(c=>c.category))).size,4);
  const secret=views[criminal].game.caseSecret;
- for(const v of views){const g=v.game;assert.equal(g.secretNPC,undefined);assert.equal(g.seed,undefined);assert.ok(g.players.every(p=>p.role===undefined&&p.clues===undefined));assert.equal(!!g.caseSecret,['culprit','accomplice'].includes(g.self.role));assert.ok(!JSON.stringify(v).includes(tokens[0]));}
+ for(const v of views){const g=v.game;assert.equal(g.secretNPC,undefined);assert.equal(g.seed,undefined);assert.ok(g.players.every(p=>p.role===undefined&&p.clues===undefined&&p.sealOutcome===undefined&&p.sealOutcomes===undefined));assert.equal(!!g.caseSecret,['culprit','accomplice'].includes(g.self.role));assert.equal(g.self.sealOutcome,undefined);assert.equal(g.self.sealOutcomes,undefined);assert.deepEqual(g.questionHistory,[]);assert.ok(!JSON.stringify(v).includes(tokens[0]));}
  async function current(){return poll(0);}
  async function ownerAction(event){const r=await current();const index=engineIds.indexOf(r.game.turnOwnerId);assert.ok(index>=0);return mutate(index,'action',{event});}
  await mutate(suspect,'action',{event:{type:'ADD_NOTE',speakerId:engineIds[criminal],text:'역할 확인 중에도 자유 발언'}});
@@ -61,6 +64,7 @@ function actual(secret,cat){const order=['coat','hand','item','zone','light'].in
    room=await mutate(detective,'action',{event:{type:'INVESTIGATE',kind:'question',targetId,category:cat,proposedValue:round%2}});
    if(round===2){assert.equal(room.game.phase,'discussion');assert.equal(room.game.review.kind,'blocked');assert.equal(room.game.kits,1);}else{
     assert.equal(room.game.phase,'answer');assert.equal(room.game.pending.proposedValue,round%2);
+    if(round===1)assert.equal((await poll(criminal)).game.self.sealOutcome,undefined);
     if(round===1){await mutate(suspect,'action',{event:{type:'ADD_NOTE',text:'답변을 기다리며 공개 대화'}});assert.equal((await current()).game.phase,'answer');}
     room=await mutate(criminal,'action',{event:{type:'ANSWER',value:actual(secret,cat)^(round>=3?1:0)}});
     assert.equal(room.game.review.kind,'answer');assert.equal(room.game.review.proposedValue,round%2);assert.equal(room.game.review.verified,false);assert.equal(room.game.review.actualValue,undefined);
@@ -73,6 +77,18 @@ function actual(secret,cat){const order=['coat','hand','item','zone','light'].in
    }
   }
   assert.equal(room.game.phase,'discussion');
+  const outcomeHistory=[{round:1,success:false,reason:'guarded'}];
+  if(round>=2)outcomeHistory.push({round:2,success:true,reason:'blocked'});
+  if(round>=3)outcomeHistory.push({round:3,success:false,reason:'missed'});
+  for(let i=0;i<6;i++){
+   const checked=(await poll(i)).game;
+   assert.equal(checked.sealOutcome,undefined);assert.equal(checked.sealOutcomes,undefined);
+   assert.equal(checked.questionHistory.length,Math.min(round,4));
+   assert.ok(checked.questionHistory.every(entry=>Object.keys(entry).sort().join(',')==='category,round,status'));
+   if(i===criminal){assert.deepEqual(checked.self.sealOutcome,outcomeHistory.at(-1));assert.deepEqual(checked.self.sealOutcomes,outcomeHistory);}
+   else {assert.equal(checked.self.sealOutcome,undefined);assert.equal(checked.self.sealOutcomes,undefined);}
+  }
+  assert.deepEqual(room.game.questionHistory[round===1?0:1],round===1?{round:1,category:'coat',status:'answered'}:{round:2,category:'hand',status:'blocked'});
   if(round===3){for(let i=0;i<6;i++){const before=await poll(i),old=tokens[i];const restored=await request({op:'login',...credentials[i]});assert.notEqual(restored.token,old);assert.equal(restored.room.meId,before.meId);assert.deepEqual(restored.room.game,before.game);tokens[i]=restored.token;await request({op:'poll',token:old},401);}const old=tokens[2];await request({op:'logout',token:old,requestId:crypto.randomUUID()});await request({op:'poll',token:old},401);const back=await request({op:'login',...credentials[2]});tokens[2]=back.token;assert.equal(back.room.code,code);}
   const before=structuredClone(room.game.facts);
   const free=await mutate(suspect,'action',{event:{type:'ADD_NOTE',speakerId:engineIds[criminal],text:'자유 발언 <b>검증</b>'}});
@@ -94,16 +110,18 @@ function actual(secret,cat){const order=['coat','hand','item','zone','light'].in
  await mutate(1,'join',{code:duoCode});await mutate(0,'ready',{ready:true});await mutate(1,'ready',{ready:true});room=await mutate(0,'start');
  assert.notEqual(room.caseId,firstCaseId);assert.equal(room.game.facts.length,2);assert.equal(new Set(room.game.facts.map(f=>f.category)).size,2);
  const duoViews=await Promise.all([poll(0),poll(1)]),duoIds=duoViews.map(v=>v.game.self.id),duoD=duoViews.findIndex(v=>v.game.self.role==='detective'),duoC=1-duoD;
+ const duoClues=duoViews[duoD].game.self.clues;assert.equal(duoViews[duoD].game.rulesVersion,3);assert.equal(duoClues.length,2);assert.equal(duoClues.filter(c=>['coat','hand','item'].includes(c.category)).length,1);assert.equal(duoClues.filter(c=>['zone','light'].includes(c.category)).length,1);
  while((room=await current()).game.phase==='reveal')await mutate(duoIds.indexOf(room.game.turnOwnerId),'action',{event:{type:'ROLE_SEEN'}});
  assert.equal(room.game.phase,'secret');assert.equal(room.game.turnOwnerId,duoIds[duoC]);
  await request({op:'action',token:tokens[duoD],revision:room.revision,requestId:crypto.randomUUID(),event:{type:'SECRET_ACTION',kind:'pass'}},403);
  await request({op:'action',token:tokens[duoC],revision:room.revision,requestId:crypto.randomUUID(),event:{type:'SECRET_ACTION',kind:'suggest',category:'coat'}},400);
  room=await mutate(duoC,'action',{event:{type:'SECRET_ACTION',kind:'pass'}});assert.equal(room.game.phase,'investigate');
  const duoSecret=duoViews[duoC].game.caseSecret;
- room=await mutate(duoD,'action',{event:{type:'INVESTIGATE',kind:'question',category:'coat',targetId:duoIds[duoC],proposedValue:1}});
- assert.equal(room.game.pending.proposedValue,1);room=await mutate(duoC,'action',{event:{type:'ANSWER',value:actual(duoSecret,'coat')}});
+ const duoCategory=['coat','hand','item','zone','light'].find(category=>!duoClues.some(clue=>clue.category===category));
+ room=await mutate(duoD,'action',{event:{type:'INVESTIGATE',kind:'question',category:duoCategory,targetId:duoIds[duoC],proposedValue:1}});
+ assert.equal(room.game.pending.proposedValue,1);room=await mutate(duoC,'action',{event:{type:'ANSWER',value:actual(duoSecret,duoCategory)}});assert.deepEqual(room.game.questionHistory,[{round:1,category:duoCategory,status:'answered'}]);
  room=await mutate(duoD,'action',{event:{type:'REVIEW_RESULT',kind:'confirm'}});assert.equal(room.game.round,2);assert.equal(room.game.turnOwnerId,duoIds[duoC]);
  await mutate(duoC,'action',{event:{type:'SECRET_ACTION',kind:'pass'}});await mutate(duoD,'action',{event:{type:'ACCUSE',...duoSecret}});await mutate(0,'restart');await mutate(0,'leave');await mutate(1,'leave');
- const result={base,passed:true,sessions:7,simultaneousPlayers:6,rounds:5,serverRequests:measurements.length,maxRequestMs:Math.max(...measurements),averageRequestMs:Math.round(measurements.reduce((a,b)=>a+b,0)/measurements.length),privacy:true,capacityRace:true,protectedEvidence:true,sharedLieBudget:true,guardAndSeal:true,reconnect:true,passwordReLogin:true,logoutPreservesSeat:true,restart:true,reviewAuditAndConfirm:true,finalPhase:true,proposedQuestions:true,chatDuringPrivateAndAnswerAndFinal:true,duoSimplified:true,caseIdentity:true};
+ const result={base,passed:true,checkedAt:new Date().toISOString(),sessions:7,simultaneousPlayers:6,rounds:5,rulesVersion:3,serverRequests:measurements.length,maxRequestMs:Math.max(...measurements),averageRequestMs:Math.round(measurements.reduce((a,b)=>a+b,0)/measurements.length),privacy:true,capacityRace:true,protectedEvidence:true,sharedLieBudget:true,guardAndSeal:true,reconnect:true,passwordReLogin:true,logoutPreservesSeat:true,restart:true,reviewAuditAndConfirm:true,finalPhase:true,proposedQuestions:true,chatDuringPrivateAndAnswerAndFinal:true,duoSimplified:true,caseIdentity:true,detectivePersonAndSceneHints:true,distinctWitnessClues:true,completedQuestionHistory:true,culpritOnlySealOutcomes:true,deferredSealOutcomeUntilAnswer:true,accompliceOutcomeCulpritOnly:true,persistentSealOutcomeHistory:true};
  const output=process.env.TEST_REPORT||require('node:path').join(__dirname,'../work/online-http-result.json');fs.mkdirSync(require('node:path').dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify(result,null,2));console.log(result);
 })().catch(e=>{console.error(e.message);process.exit(1)});

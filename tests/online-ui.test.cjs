@@ -82,7 +82,8 @@ function makeClient(service,index,options={}){
  const document={body:new Element('body'),hidden:false,activeElement:null,querySelector:selector=>document.body.querySelector(selector),querySelectorAll:selector=>document.body.querySelectorAll(selector),getElementById:id=>document.body.querySelector('#'+id),addEventListener:(name,callback)=>(listeners[name]??=[]).push(callback)};
  for(const id of ['app','modal-host','toast-host','atmosphere','blood-edge']){const element=new Element('div',{id});element.parentNode=document.body;document.body.children.push(element);}
  const location={href:options.href||'http://localhost/',origin:'http://localhost',pathname:'/'};
- const window={location,history:{replaceState(){}},crypto:{randomUUID:()=>crypto.randomUUID()},WitnessFX:{init(){},setQuality(){},setPrivate(){},burst(){}},WitnessCasePresentation:{busy:()=>false,showStory:({onDone})=>onDone(),cancel(){},questionText(){return'';},answerText(){return'';},type(element,text){element.textContent=text;return{cancel(){}};}},scrollX:0,scrollY:0,scrollTo(){},addEventListener:(name,callback)=>(listeners['window-'+name]??=[]).push(callback)};
+ const immediatePresentation={busy:()=>false,showStory:({onDone})=>onDone(),cancel(){},questionText(){return'';},answerText(){return'';},type(element,text,settings={}){element.textContent=text;const result={cancelled:false,text};queueMicrotask(()=>settings.onDone?.(result));return{cancel(){},finish(){},done:true,promise:Promise.resolve(result)};}};
+ const window={location,history:{replaceState(){}},crypto:{randomUUID:()=>crypto.randomUUID()},WitnessFX:{init(){},setQuality(){},setPrivate(){},burst(){}},WitnessCasePresentation:options.presentation||immediatePresentation,scrollX:0,scrollY:0,scrollTo(){},addEventListener:(name,callback)=>(listeners['window-'+name]??=[]).push(callback)};
  const context={document,window,URL,AbortController,matchMedia:()=>({matches:false}),sessionStorage:{getItem:key=>sessions.get(key)||null,setItem:(key,value)=>sessions.set(key,value),removeItem:key=>sessions.delete(key)},localStorage:{getItem:key=>remembered.get(key)||null,setItem:(key,value)=>remembered.set(key,value),removeItem:key=>remembered.delete(key)},setTimeout:()=>1,clearTimeout(){},navigator:{clipboard:{writeText:async()=>{}}},console,
   fetch:async(url,options)=>{
    if(url==='/party-rules.html')return{ok:true,text:async()=>fs.readFileSync(path.join(publicDir,'party-rules.html'),'utf8')};
@@ -91,10 +92,10 @@ function makeClient(service,index,options={}){
    catch(error){if(!(error instanceof GameError))throw error;return{ok:false,status:error.status,json:async()=>({error:error.message,code:error.code})};}
   }
  };
- vm.createContext(context);for(const file of ['catalog.js','case-interface.js'])vm.runInContext(fs.readFileSync(path.join(publicDir,file),'utf8'),context);
+ vm.createContext(context);for(const file of ['catalog.js','detective-options.js','case-interface.js'])vm.runInContext(fs.readFileSync(path.join(publicDir,file),'utf8'),context);
  if(options.practice){vm.runInContext(fs.readFileSync(path.join(publicDir,'practice-engine.js'),'utf8'),context);window.WitnessPracticeEngine=context.WitnessPracticeEngine;vm.runInContext(fs.readFileSync(path.join(publicDir,'practice.js'),'utf8'),context);assert.ok(window.WitnessPracticeEngine,'real browser practice engine is loaded');assert.ok(window.WitnessPractice,'real browser practice adapter is loaded');}
  let source=fs.readFileSync(path.join(publicDir,'online-app.js'),'utf8');const end=source.lastIndexOf('}());');assert.ok(end>0,'UI IIFE boundary exists');
- source=source.slice(0,end)+'window.audit={act,poll,privacy,getRoom:()=>room,getPrivate:()=>privateVisible,getAccount:()=>account,getDrafts:()=>drafts,getModalKind:()=>modalKind};'+source.slice(end);vm.runInContext(source,context);
+ source=source.slice(0,end)+'window.audit={act,poll,privacy,acceptRoom,render,setPending:value=>{pending=value;render();},getRoom:()=>room,getPrivate:()=>privateVisible,getAccount:()=>account,getDrafts:()=>drafts,getModalKind:()=>modalKind};'+source.slice(end);vm.runInContext(source,context);
  const html=()=>document.getElementById('app').innerHTML,modal=()=>document.getElementById('modal-host').innerHTML;
  return{document,api:window.audit,practice:window.WitnessPractice,requests,listeners,sessions,remembered,html,modal,combined:()=>html()+modal(),toast:()=>document.getElementById('toast-host').innerHTML};
 }
@@ -154,8 +155,11 @@ for(const count of [2,3,4,5,6])test('online UI: '+count+' authenticated clients 
    assert.equal(owner.api.getModalKind(),'personal','detective investigation automatically opens');await act(owner,'private-show');assert.ok(owner.modal().includes('case-investigation'));
    assert.equal(owner.modal().includes('data-action="accuse"'),g.round<5,'fifth-round investigation precedes accusation');
    const culprit=clients.find(client=>client.api.getRoom().game.self.role==='culprit').api.getRoom().game.self.id;
-   owner.document.querySelector('#question-target').value=culprit;owner.document.querySelector('#question-category').value='coat';owner.document.querySelector('#question-proposed').value='1';
-   if(g.round===1){const input=owner.document.querySelector('#question-proposed');input.focus();await owner.api.poll();assert.ok(owner.document.querySelector('#question-proposed')===input,'same revision retains question input');const other=clients.find(c=>c!==owner);other.document.querySelector('#chat-text').value='질문 작성 중인 탐정을 기다립니다.';await act(other,'send-note');await owner.api.poll();assert.equal(owner.api.getModalKind(),'personal','new chat revision preserves the question window');assert.equal(owner.document.querySelector('#question-target').value,culprit);assert.equal(owner.document.querySelector('#question-category').value,'coat');assert.equal(owner.document.querySelector('#question-proposed').value,'1');assert.equal(owner.document.activeElement.id,'question-proposed','question focus survives a new revision');}
+   const questionField=owner.document.querySelector('#question-category');
+   if(!questionField||questionField.disabled||!questionField.querySelector('option[value]')){assert.ok(!owner.document.querySelector('[data-action="question"]')||owner.document.querySelector('[data-action="question"]').disabled,'no hidden fallback question remains');await act(owner,'skip');await act(owner,'skip-confirm');continue;}
+   const chosenCategory=questionField.value;
+   owner.document.querySelector('#question-target').value=culprit;owner.document.querySelector('#question-proposed').value='1';
+   if(g.round===1){const input=owner.document.querySelector('#question-proposed');input.focus();await owner.api.poll();assert.ok(owner.document.querySelector('#question-proposed')===input,'same revision retains question input');const other=clients.find(c=>c!==owner);other.document.querySelector('#chat-text').value='질문 작성 중인 탐정을 기다립니다.';await act(other,'send-note');await owner.api.poll();assert.equal(owner.api.getModalKind(),'personal','new chat revision preserves the question window');assert.equal(owner.document.querySelector('#question-target').value,culprit);assert.equal(owner.document.querySelector('#question-category').value,chosenCategory);assert.equal(owner.document.querySelector('#question-proposed').value,'1');assert.equal(owner.document.activeElement.id,'question-proposed','question focus survives a new revision');}
    if(g.round<=2){const target=clients.find(c=>c.api.getRoom().game.self.id===culprit);await act(target,g.round===1?'rules':'ledger');assert.equal(target.api.getModalKind(),g.round===1?'rules':'ledger','target can read a nonturn window while waiting');}
    await act(owner,'question');
    assert.equal(owner.api.getRoom().game.pending.proposedValue,1,'chosen question assumption reaches the engine');
@@ -175,7 +179,7 @@ for(const count of [2,3,4,5,6])test('online UI: '+count+' authenticated clients 
    assert.equal(owner.api.getModalKind(),'personal','final turn opens detective window');await act(owner,'private-show');assert.ok(owner.modal().includes('data-action="accuse"'));await act(owner,'accuse');owner.document.querySelector('#accuse-person').value='s0';owner.document.querySelector('#accuse-place').value='p0';await act(owner,'confirm-accuse');
   }else assert.fail('Unexpected phase '+g.phase);
  }
- await sync(clients);assert.equal(host.api.getRoom().status,'finished');assert.equal(roleActions,count);assert.equal(secretActions,count===2?5:count*5);assert.equal(answers,5);assert.equal(discussions,5);assert.equal(audits,1);assert.deepEqual([...chatted].sort(),['answer','discussion','final','investigate','reveal','secret'].sort());
+ await sync(clients);assert.equal(host.api.getRoom().status,'finished');assert.equal(roleActions,count);assert.equal(secretActions,count===2?5:count*5);assert.equal(answers,3,'the detective asks each of the three unknown categories once');assert.equal(discussions,5);assert.equal(audits,1);assert.deepEqual([...chatted].sort(),['answer','discussion','final','investigate','reveal','secret'].sort());
  for(const client of clients){assert.ok(client.html().includes('수사 진영의 승리'));assert.ok(client.html().includes('모든 역할과 진영 공개'));for(const request of client.requests.filter(r=>r.op==='action')){assert.ok(!Object.hasOwn(request.event,'actorId'));assert.ok(!Object.hasOwn(request.event,'speakerId'));assert.ok(request.requestId);assert.ok(Number.isSafeInteger(request.revision));}}
 });
 
@@ -259,4 +263,136 @@ test('practice UI: an authenticated player returns to the exact online seat and 
  await act(client,'practice-exit');await client.api.poll();await settle();const after=client.api.getRoom();
  assert.equal(client.practice.active(),false);assert.equal(after.code,before.code);assert.equal(after.meId,before.meId);assert.equal(after.hostId,before.hostId);assert.equal(after.revision,before.revision);assert.deepEqual(after.game,before.game,'all online role, private clues, case, resources and pending turn are preserved');assert.deepEqual(client.api.getAccount(),accountBefore);assert.equal(client.sessions.get('last-witness-online-token'),tokenBefore);assert.equal(client.sessions.get('last-witness-online-name'),nameBefore);assert.deepEqual([...client.remembered],rememberedBefore);assert.ok(!client.combined().includes('YOUR SECRET ROLE'),'the restored online role is sealed again');assert.ok(!client.html().includes('컴퓨터와 연습 중'));
  assert.ok(client.requests.slice(requestCount).every(request=>request.op==='poll'),'returning may poll but cannot mutate the server room');await partner.api.poll();assert.deepEqual(partner.api.getRoom().game,partnerBefore,'the partner sees the untouched online game');assertNoPasswordPersisted(client);
+});
+
+// Deliberately unfinished handwriting reproduces a poll arriving while a person
+// is still reading. No wall-clock sleeps or network races are involved.
+function controlledPresentation(){
+ const types=[],scenes=[];
+ const api={types,scenes,busy:()=>false,questionText:()=> '탐정의 질문입니다.',answerText:()=> '목격자의 답변입니다.',
+  showStory(settings){scenes.push({kind:'story',day:settings.day,stage:settings.stage});settings.onDone?.();return Promise.resolve({cancelled:false});},
+  showDay(day,settings){scenes.push({kind:'day',day});settings.onDone?.();return Promise.resolve({cancelled:false});},
+  type(element,text,settings={}){let resolve,done=false;const promise=new Promise(r=>{resolve=r;});element.textContent=String(text).slice(0,1);const handle={element,text,promise,get done(){return done;},finish(){if(done)return;done=true;element.textContent=text;const result={cancelled:false,text};resolve(result);queueMicrotask(()=>settings.onDone?.(result));},cancel(){if(done)return;done=true;resolve({cancelled:true});}};types.push(handle);return handle;},
+  cancel(){types.forEach(handle=>handle.cancel());}
+ };return api;
+}
+function projectedRoom(role,patch={}){
+ const state=JSON.parse(JSON.stringify(Party.makeGame(['가','나','다','라','마','바'],{seed:17,secret:{suspectId:'s0',placeId:'p0'}})));
+ const actor=state.players.find(p=>p.role===role);state.phase=patch.phase||'investigate';state.round=patch.round||1;
+ if(state.phase==='answer')state.pending={targetId:actor.id,category:'item',proposedValue:0};
+ const g=JSON.parse(JSON.stringify(Party.publicView(state)));g.self=JSON.parse(JSON.stringify(actor));
+ g.self.clues=role==='detective'?[{category:'coat',value:0},{category:'zone',value:0}]:[];
+ Object.assign(g,patch);g.self={...JSON.parse(JSON.stringify(actor)),...g.self};
+ if(role==='culprit'){g.caseSecret=state.secretNPC;g.remainingLies=2;g.partnerIds=[];}
+ return {code:'ABC234',caseId:'synthetic-case-ui',capacity:6,status:'playing',revision:1,hostId:actor.id,meId:actor.id,members:state.players.map(p=>({id:p.id,gameId:p.id,name:p.name,ready:true,online:true})),game:g};
+}
+async function loadProjection(client,room){client.api.acceptRoom(room,true);await settle();}
+function selectValues(client,id){return(client.document.querySelector('#'+id)?.querySelectorAll('option')||[]).map(option=>option.value).filter(Boolean);}
+
+test('detective UI: final accusation combines official evidence, own memories, and manual exclusions',async()=>{
+ const client=makeClient(createService({store:new MemoryStore()}),601),room=projectedRoom('detective',{phase:'final',facts:[{id:'fact-1',category:'hand',value:0,source:'search',round:1}]});
+ await loadProjection(client,room);await act(client,'private-show');await act(client,'mark-s',{id:'s0'});await act(client,'mark-p',{id:'p1'});await act(client,'accuse');
+ assert.deepEqual(selectValues(client,'accuse-person'),['s1'],'official hand clue + own coat clue + manual s0 exclusion leave s1');
+ assert.deepEqual(selectValues(client,'accuse-place'),['p0'],'own zone clue + manual p1 exclusion leave p0');
+ assert.equal(client.document.querySelector('#confirm-accuse').disabled,true,'placeholders require an explicit final selection');
+ await act(client,'close-modal');await act(client,'mark-s',{id:'s1'});await act(client,'mark-p',{id:'p0'});await act(client,'accuse');
+ assert.deepEqual(selectValues(client,'accuse-person'),[]);assert.deepEqual(selectValues(client,'accuse-place'),[]);
+ assert.equal(client.document.querySelector('#confirm-accuse').disabled,true,'crossing out every candidate never restores excluded choices');
+ assert.ok(client.document.getElementById('modal-host').querySelector('[data-action="clear-marks"]'),'empty manual result offers memo reset inside final accusation');
+});
+
+test('detective UI: known, answered, unknown and blocked categories never return as an empty-list fallback',async()=>{
+ const client=makeClient(createService({store:new MemoryStore()}),602),room=projectedRoom('detective',{questionHistory:[{round:1,category:'hand',status:'answered'},{round:2,category:'item',status:'blocked'},{round:3,category:'light',status:'unknown'}]});
+ client.api.getDrafts().questionCategory='coat';client.api.getDrafts().questionProposed='1';await loadProjection(client,room);await act(client,'private-show');
+ const field=client.document.querySelector('#question-category'),question=client.document.querySelector('[data-action="question"]');
+ assert.ok(!field||field.disabled||selectValues(client,'question-category').length===0,'all five exhausted categories are removed');
+ assert.ok(!question||question.disabled,'there is no enabled question backed by hidden coat/zero defaults');
+ assert.ok(!client.document.querySelector('#question-proposed')||client.document.querySelector('#question-proposed').disabled,'assumptions also stop when no category remains');
+ assert.ok(client.modal().includes('data-action="skip"'),'a valid pass preserves five-day progress with no new questions');
+ await act(client,'tab',{id:'search'});const search=client.document.getElementById('modal-host').querySelectorAll('[data-action="search"]');assert.deepEqual(search.map(button=>button.dataset.category),['hand','item','light'],'the one-use forensic kit can still establish truth for previously unresolved questions');assert.ok(search.every(button=>!['coat','zone'].includes(button.dataset.category)),'field search never spends a kit on an already known truth');
+});
+
+test('detective UI: filtering an old category draft also rebuilds its matching assumption choices',async()=>{
+ const client=makeClient(createService({store:new MemoryStore()}),612),room=projectedRoom('detective',{questionHistory:[{round:1,category:'hand',status:'answered'},{round:2,category:'light',status:'blocked'}]});
+ await loadProjection(client,room);client.api.getDrafts().questionCategory='coat';client.api.getDrafts().questionProposed='1';await act(client,'private-show');
+ assert.deepEqual(selectValues(client,'question-category'),['item']);assert.equal(client.document.querySelector('#question-category').value,'item');
+ assert.equal(client.document.querySelector('#question-proposed').value,'0','switching away from filtered stale draft resets its assumption');
+ assert.deepEqual(client.document.querySelector('#question-proposed').querySelectorAll('option').map(o=>o.textContent),['장갑','손목시계'],'assumption labels belong to the remaining item category');
+});
+
+test('detective UI: a blocked review finishes handwriting before confirmation can advance',async()=>{
+ const scene=controlledPresentation(),client=makeClient(createService({store:new MemoryStore()}),603,{presentation:scene}),room=projectedRoom('detective',{phase:'discussion',review:{kind:'blocked',round:1,category:'item'}});
+ await loadProjection(client,room);assert.equal(client.api.getModalKind(),'review');
+ assert.equal(client.document.querySelector('[data-action="review-confirm"]').disabled,true,'next day cannot interrupt the blocked explanation');
+ assert.ok(client.document.querySelector('[data-action="letter-finish"]'),'readers can explicitly finish the handwriting');
+ await act(client,'letter-finish');assert.equal(scene.types.at(-1).done,true);assert.equal(client.api.getRoom().game.round,1,'fast-forward reveals text without advancing a day');
+ assert.equal(client.document.querySelector('[data-action="review-confirm"]').disabled,false,'the later confirmation becomes available after text completion');
+});
+
+test('notice UI: a blocked notice survives a newer day, then drains to the latest day without replay',async()=>{
+ const scene=controlledPresentation(),client=makeClient(createService({store:new MemoryStore()}),604,{presentation:scene}),base=projectedRoom('witness');
+ await loadProjection(client,base);
+ const blocked=JSON.parse(JSON.stringify(base));blocked.revision=2;blocked.game.phase='discussion';blocked.game.review={kind:'blocked',round:1,category:'item'};await loadProjection(client,blocked);
+ assert.equal(client.api.getModalKind(),'obstruction');const original=client.modal(),typing=scene.types.at(-1),sceneCount=scene.scenes.length;
+ assert.equal(client.document.querySelector('[data-action="notice-continue"]').disabled,true);assert.ok(client.document.querySelector('[data-action="notice-finish"]'));
+ const next=JSON.parse(JSON.stringify(blocked));next.revision=3;next.game.phase='secret';next.game.round=2;next.game.review=null;next.game.turnOwnerId=next.game.self.id;await loadProjection(client,next);
+ assert.equal(client.api.getModalKind(),'obstruction');assert.equal(client.modal(),original,'a poll must not replace the partly written notice');assert.equal(typing.done,false);assert.equal(scene.scenes.length,sceneCount,'DAY-02 story waits behind current notice');
+ await act(client,'notice-finish');assert.equal(client.api.getRoom().game.round,2);assert.equal(client.api.getModalKind(),'obstruction','first action only completes the current message');assert.equal(client.document.querySelector('[data-action="notice-continue"]').disabled,false);
+ await act(client,'notice-continue');assert.ok(scene.scenes.some(s=>s.kind==='story'&&s.day===2),'continuation displays the newest day story');assert.equal(client.api.getModalKind(),'personal','own current turn menu follows the completed story');
+ await loadProjection(client,next);assert.equal(client.api.getModalKind(),'personal','repeated polling cannot replay consumed obstruction');
+});
+
+test('notice UI: failed concealment is shown only to the culprit and only once per case and round',async()=>{
+ for(const role of ['detective','witness','suspect','accomplice','culprit']){
+  const scene=controlledPresentation(),client=makeClient(createService({store:new MemoryStore()}),610,{presentation:scene}),base=projectedRoom(role);await loadProjection(client,base);
+  const resolved=JSON.parse(JSON.stringify(base));resolved.revision=2;resolved.game.phase='discussion';resolved.game.review={kind:'search',category:'item',round:1,value:0,verified:true,actualValue:0};resolved.game.self.sealOutcome={round:1,success:false,reason:'miss'};await loadProjection(client,resolved);
+  if(role!=='culprit'){assert.notEqual(client.api.getModalKind(),'obstruction',role+' must never render the culprit-only failure');continue;}
+  assert.equal(client.api.getModalKind(),'obstruction');assert.ok(client.modal().includes('은폐'),'culprit receives an explicit outcome');assert.equal(client.document.querySelector('[data-action="notice-continue"]').disabled,true);
+  await act(client,'notice-finish');await act(client,'notice-continue');await loadProjection(client,resolved);assert.notEqual(client.api.getModalKind(),'obstruction','same private result cannot replay under polling');
+ }
+});
+
+test('notice UI: changing the case cancels pending handwriting without a stale continuation',async()=>{
+ const scene=controlledPresentation(),client=makeClient(createService({store:new MemoryStore()}),611,{presentation:scene}),base=projectedRoom('culprit');await loadProjection(client,base);
+ const resolved=JSON.parse(JSON.stringify(base));resolved.revision=2;resolved.game.phase='discussion';resolved.game.self.sealOutcome={round:1,success:false,reason:'miss'};await loadProjection(client,resolved);assert.equal(client.api.getModalKind(),'obstruction');const old=scene.types.at(-1);
+ const replacement=projectedRoom('culprit');replacement.caseId='brand-new-case-ui';replacement.revision=3;await loadProjection(client,replacement);old.finish();await settle();
+ assert.equal(client.api.getRoom().caseId,'brand-new-case-ui');assert.notEqual(client.api.getModalKind(),'obstruction','cancelled old case cannot open its notice or next-turn continuation');
+});
+
+test('detective UI: incoming chat and pending renders retain one review typing session before audit is enabled',async()=>{
+ for(const originalValue of [0,1]){
+  const scene=controlledPresentation(),client=makeClient(createService({store:new MemoryStore()}),620+originalValue,{presentation:scene}),room=projectedRoom('detective',{phase:'discussion'}),target=room.game.players.find(p=>!p.isDetective).id;
+  room.game.statements=[{id:'statement-1',round:1,speakerId:target,category:'item',value:originalValue,audited:false}];
+  room.game.review={kind:'answer',round:1,category:'item',targetId:target,statementId:'statement-1',value:originalValue,verified:false,proposedValue:0};
+  await loadProjection(client,room);const typing=scene.types.at(-1),typedElement=typing.element,typesStarted=scene.types.length;
+  assert.equal(client.document.querySelector('[data-action="review-audit"]').disabled,true);assert.equal(client.document.querySelector('[data-action="review-confirm"]').disabled,true);
+  const changed=JSON.parse(JSON.stringify(room));changed.revision=2;changed.game.notes.push({round:1,speakerId:target,text:'답변을 읽는 동안 보낸 자유 발언'});await loadProjection(client,changed);
+  client.api.setPending(true);await settle();client.api.setPending(false);await settle();
+  assert.equal(scene.types.length,typesStarted,'chat revision and sending-state renders do not restart handwriting');assert.equal(typing.done,false,'a rerender does not cancel current typing');assert.equal(typing.element,typedElement);assert.ok(typedElement.isConnected,'the original paper paragraph remains in the live dialog');
+  assert.equal(client.document.querySelector('[data-action="review-audit"]').disabled,true,'audit stays locked while the reply is incomplete');
+  await act(client,'letter-finish');assert.equal(client.document.querySelector('[data-action="review-audit"]').disabled,false,'the existing kit can be used after the reply finishes');assert.equal(client.document.querySelector('[data-action="review-confirm"]').disabled,false);
+  const verified=JSON.parse(JSON.stringify(changed));verified.revision=3;verified.game.kits=0;verified.game.review.verified=true;verified.game.review.actualValue=0;verified.game.statements[0].audited=true;verified.game.facts.push({id:'fact-1',round:1,category:'item',value:0,source:'audit',statementId:'statement-1'});await loadProjection(client,verified);
+  const review=client.document.querySelector('.case-review');assert.equal(review.classList.contains('is-verified-lie'),originalValue===1,'red border class applies precisely to an actual contradiction');assert.equal(client.api.getRoom().game.statements[0].value,originalValue,'verification does not replace the historical answer');assert.equal(client.document.querySelector('[data-action="review-audit"]'),null,'a spent and audited reply cannot offer another verification');assert.equal(client.document.querySelector('[data-action="review-confirm"]').disabled,false,'both truth and lie results can be confirmed after reading');
+ }
+});
+
+test('notice UI: a culprit private result is concealed on blur and resumes unread without stale typing callbacks',async()=>{
+ const scene=controlledPresentation(),client=makeClient(createService({store:new MemoryStore()}),630,{presentation:scene}),base=projectedRoom('culprit');await loadProjection(client,base);
+ const resolved=JSON.parse(JSON.stringify(base));resolved.revision=2;resolved.game.phase='discussion';resolved.game.self.sealOutcome={round:1,success:false,reason:'missed'};await loadProjection(client,resolved);
+ assert.equal(client.api.getModalKind(),'obstruction');const first=scene.types.at(-1),seenKey=resolved.caseId+':seal:1';
+ client.api.privacy();await settle();assert.notEqual(client.api.getModalKind(),'obstruction','private failure must leave the DOM when privacy is requested');assert.ok(!client.modal().includes('PRIVATE RECORD'));assert.ok(!client.sessions.has(seenKey),'concealing an unread notice does not mark it consumed');
+ for(const focus of client.listeners['window-focus']||[])focus();await settle();assert.equal(client.api.getModalKind(),'obstruction','returning focus resumes the unread private outcome');const second=scene.types.at(-1);assert.notEqual(second,first);
+ for(const blur of client.listeners['window-blur']||[])blur();await settle();assert.notEqual(client.api.getModalKind(),'obstruction','the actual window blur handler also removes private text');assert.ok(!client.sessions.has(seenKey));
+ for(const focus of client.listeners['window-focus']||[])focus();await settle();const current=scene.types.at(-1);first.finish();second.finish();await settle();
+ assert.equal(current.done,false,'cancelled older writing cannot finish the new privacy cycle');assert.equal(client.document.querySelector('[data-action="notice-continue"]').disabled,true);
+ await act(client,'notice-finish');await act(client,'notice-continue');assert.equal(client.sessions.get(seenKey),'1');await loadProjection(client,resolved);assert.notEqual(client.api.getModalKind(),'obstruction','a completed result remains consumed after later polling');
+});
+
+test('detective UI: review updates received while handwriting refresh the verdict only after the current text finishes',async()=>{
+ const scene=controlledPresentation(),client=makeClient(createService({store:new MemoryStore()}),631,{presentation:scene}),room=projectedRoom('detective',{phase:'discussion'}),target=room.game.players.find(p=>!p.isDetective).id;
+ room.game.statements=[{id:'statement-1',round:1,speakerId:target,category:'item',value:1,audited:false}];room.game.review={kind:'answer',round:1,category:'item',targetId:target,statementId:'statement-1',value:1,verified:false,proposedValue:0};
+ await loadProjection(client,room);const original=scene.types.at(-1),element=original.element;
+ const otherSession=JSON.parse(JSON.stringify(room));otherSession.revision=2;otherSession.game.kits=0;otherSession.game.statements[0].audited=true;otherSession.game.review.verified=true;otherSession.game.review.actualValue=0;otherSession.game.facts.push({id:'fact-1',round:1,category:'item',value:0,source:'audit',statementId:'statement-1'});await loadProjection(client,otherSession);
+ assert.equal(original.done,false,'the incoming verdict preserves the current sentence');assert.ok(element.isConnected);assert.equal(client.document.querySelector('.case-review').classList.contains('is-verified-lie'),false,'the old dialog remains intact until its writing finishes');
+ await act(client,'letter-finish');assert.equal(client.document.querySelector('.case-review').classList.contains('is-verified-lie'),true,'completion immediately applies the latest authoritative verification');assert.equal(client.document.querySelector('[data-action="review-audit"]'),null,'stale verification controls are removed');assert.equal(client.document.querySelector('[data-action="review-confirm"]').disabled,false);assert.equal(client.api.getRoom().game.kits,0);assert.equal(client.api.getRoom().game.statements[0].value,1);
 });
