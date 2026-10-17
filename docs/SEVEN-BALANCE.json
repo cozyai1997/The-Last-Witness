@@ -1,0 +1,182 @@
+{
+  "version": 2,
+  "ruleVersion": 4,
+  "finalAccusation": "person-only",
+  "catalogCounts": {
+    "people": 12,
+    "places": 12,
+    "tools": 12,
+    "times": 12
+  },
+  "generatedAt": "2026-10-17T10:45:27.658Z",
+  "codeHashes": {
+    "engine": "b8b19ca9b7ad8b426e47d6973587bf7b2b51b4b67d98e59e6a43741a7b3718ad",
+    "data": "be393aa26ad4400491c897c71ea3c4f819107e53cf76216f6582dd5819699f73"
+  },
+  "reproduce": "PowerShell: $env:SEVEN_BALANCE_SEEDS=\"100\"; $env:SEVEN_WRITE_BALANCE=\"1\"; node --test tests/seven-engine.test.cjs",
+  "contract": {
+    "events": [
+      "ROLE_SEEN",
+      "SECRET_ACTION",
+      "QUESTION",
+      "SEARCH",
+      "AUDIT",
+      "INVESTIGATE",
+      "ANSWER",
+      "REVIEW_AUDIT",
+      "ROUND_CONFIRM",
+      "ACCUSE",
+      "ADD_NOTE"
+    ],
+    "accusation": {
+      "type": "ACCUSE",
+      "suspectId": "s0..s11"
+    },
+    "privateAnswerOptions": "self.answerOptions.legalValues",
+    "fieldReference": "Version2 public possible ranges: people[{suspectId,placeIds[6],toolIds[6],timeIds[6],routes[6]:{placeId,toolId,timeId}}], places[{placeId,toolIds[6],timeIds[6]}]. Paired rows must be read together; none identifies an actual event."
+  },
+  "sourcePurposes": {
+    "portrait": "One observed person trait. It identifies neither a player nor a role.",
+    "access": "A different person trait. Its case-specific resemblance pair varies among six category combinations.",
+    "scene": "One structural feature limits the paired possible routes for people; it does not name the actual location.",
+    "tool": "Six compatible tools limit paired routes. Exact-tool testimony can further narrow the evidence.",
+    "time": "Six compatible 15-minute intervals limit paired routes. Exact-time testimony can further narrow the evidence."
+  },
+  "ablationMethod": {
+    "baseline": "All five actual original-record snapshots plus D initial private observations and known-own innocence, using the same public fieldReference.",
+    "sourceAblations": "Remove originals in the given dimension and D private clues in that dimension; count cases that restore at least one person, not just more coordinate combinations.",
+    "recordAblations": "Remove only that original record, preserving all other original records and every D private clue; count cases that restore at least one person.",
+    "comparison": "The previous Cartesian-marginal model restored people in 0/500 cases for each place/tool/time dimension. Paired-route constraints replace that shortcut."
+  },
+  "audit": {
+    "seedsPerPlayerCount": 100,
+    "playerCounts": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runsPerPolicy": 500,
+    "policies": {
+      "originals-first": {
+        "games": 500,
+        "detectiveWins": 327,
+        "criminalWins": 173,
+        "SWin": 124,
+        "SLoss": 47,
+        "SSurvived": 129,
+        "questions": 699,
+        "audits": 465,
+        "searches": 2749,
+        "blocked": 250,
+        "finalPeopleTotal": 1215,
+        "uniqueFinalPeople": 89,
+        "detectiveWinFraction": 0.654,
+        "meanFinalPeople": 2.43
+      },
+      "verified-observations-first": {
+        "games": 500,
+        "detectiveWins": 336,
+        "criminalWins": 164,
+        "SWin": 155,
+        "SLoss": 39,
+        "SSurvived": 106,
+        "questions": 1030,
+        "audits": 500,
+        "searches": 2463,
+        "blocked": 451,
+        "finalPeopleTotal": 1207,
+        "uniqueFinalPeople": 92,
+        "detectiveWinFraction": 0.672,
+        "meanFinalPeople": 2.414
+      }
+    },
+    "invariants": {
+      "illegalActions": 0,
+      "truthEliminated": 0,
+      "activeProjectionLeaks": 0
+    },
+    "sourceSweep": {
+      "cases": 500,
+      "minimumPublicPeople": 3,
+      "maximumPublicPeople": 4,
+      "uniquePublicPeople": 0,
+      "SRetained": 300,
+      "minimumDetectivePrivatePeople": 2,
+      "uniqueDetectivePrivatePeople": 0,
+      "detectivePrivateSRetained": 300
+    },
+    "sourceAblations": {
+      "place": {
+        "cases": 500,
+        "changedPersonSets": 73,
+        "restoredPeople": 73
+      },
+      "tool": {
+        "cases": 500,
+        "changedPersonSets": 42,
+        "restoredPeople": 42
+      },
+      "time": {
+        "cases": 500,
+        "changedPersonSets": 39,
+        "restoredPeople": 39
+      }
+    },
+    "recordAblations": {
+      "portrait": {
+        "cases": 500,
+        "changedPersonSets": 159,
+        "restoredPeople": 215
+      },
+      "access": {
+        "cases": 500,
+        "changedPersonSets": 148,
+        "restoredPeople": 205
+      },
+      "scene": {
+        "cases": 500,
+        "changedPersonSets": 19,
+        "restoredPeople": 19
+      },
+      "tool": {
+        "cases": 500,
+        "changedPersonSets": 42,
+        "restoredPeople": 42
+      },
+      "time": {
+        "cases": 500,
+        "changedPersonSets": 39,
+        "restoredPeople": 39
+      }
+    },
+    "SInitial": {
+      "cases": 300,
+      "containsC": 61,
+      "doesNotContainC": 239
+    },
+    "resemblancePairs": [
+      "access,gender",
+      "access,hand",
+      "access,work",
+      "gender,hand",
+      "gender,work",
+      "hand,work"
+    ]
+  },
+  "limits": [
+    "These are deterministic bot-policy outcomes, not human win rates or a claim of optimal balance.",
+    "Both policies use only authenticated projected views. Evaluation reads actual truth only to count outcomes and invariant violations.",
+    "Originals-first reads all available original records before questioning; verified-observations-first questions a volunteered observation while a kit remains, audits it, then returns to originals.",
+    "The crime policy knows only its permitted caseSecret, deters lies while a public kit remains, then spends only legal shared lies. It guesses seal categories without raw record access.",
+    "S uses two memories, then makes one private DAY4 report based on projected candidates and unverified voluntary observations. No correct-answer feedback is available.",
+    "All-record sweep deliberately grants all five originals for information-pressure analysis. It leaves at least three public people including C/S; adding initial D observations and known-own innocence still leaves at least two and retains S.",
+    "Generation preserves a possible route for C, S and a third person under all originals and initial D observations. Other routes are sampled from coherent permissions/ranges. This is a constrained puzzle model, not physical forensic simulation.",
+    "A possible route means an exhaustive in-game compatibility option, not a confirmed visit, actual use, proved alibi or causal forensic finding. Public data never labels which possible event actually happened.",
+    "Each partial source narrows person possibilities in some cases. No source dimension is claimed necessary in every case; duplicate or already-sufficient observations can make an individual record redundant.",
+    "Restricting generation to four-person resemblance groups was rejected: it would reduce six resemblance category pairs to two and make S partners deterministic for eight of twelve culprit profiles.",
+    "Free-text chat can contain arbitrary deception; these policies model one volunteered observation per seat and are not conversational agents.",
+    "Search repetition never yields additional constraints. A kit certifies statement truth only, including twelve-valued tool/time claims."
+  ]
+}

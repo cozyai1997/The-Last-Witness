@@ -190,5 +190,27 @@
     const callback = match?.onChange; generation += 1; clearTimer(); match = null;
     const data = { room: null, account: null }; if (callback) { try { callback(data); } catch (_) {} } return data;
   }
-  root.WitnessPractice = Object.freeze({ start, request, active: () => !!match, stop });
+  // The explicit version boundary preserves existing local v3 cases/tests while
+  // the new start screen requests rulesVersion 4 through the same request API.
+  let seven = null, sevenPromise = null, routeGeneration = 0;
+  function loadSeven() {
+    if (root.WitnessSevenPractice) return Promise.resolve(root.WitnessSevenPractice);
+    if (!sevenPromise) sevenPromise = new Promise((resolve, reject) => {
+      const script = document.createElement('script'); script.src = '/seven-practice.js'; script.async = true;
+      script.onload = () => root.WitnessSevenPractice ? resolve(root.WitnessSevenPractice) : reject(failure('7일 연습을 준비하지 못했습니다.'));
+      script.onerror = () => { sevenPromise = null; script.remove(); reject(failure('7일 연습을 불러오지 못했습니다.')); };
+      document.head.appendChild(script);
+    });
+    return sevenPromise;
+  }
+  root.WitnessPractice = Object.freeze({
+    async start(options = {}) {
+      const stamp = ++routeGeneration;
+      if (options.rulesVersion === 4) { stop(); seven?.stop(); const loaded = await loadSeven(); if (routeGeneration !== stamp) return { room: null, account: null }; seven = loaded; return seven.start(options); }
+      seven?.stop(); seven = null; return start(options);
+    },
+    request(body) { return seven?.active() ? seven.request(body) : request(body); },
+    active: () => !!match || !!seven?.active(),
+    stop() { routeGeneration++; const hadSeven = seven?.active(); const data = seven?.stop(); seven = null; return hadSeven ? data : stop(); }
+  });
 }(typeof window !== 'undefined' ? window : globalThis));

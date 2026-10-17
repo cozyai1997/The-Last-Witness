@@ -34,6 +34,8 @@
   const typedLetters = new Set(), Scene = window.WitnessCasePresentation;
   const U = window.WitnessCaseUI.create({ G, esc, icon, options, category, npc, place, roleLabel, playerName, truth, disabled, fieldValue, drafts, mine, chatSeen: () => chatReadCount });
   const Replay = window.WitnessReplay.create({ G, esc });
+  const Seven = window.WitnessSevenUI && window.WitnessSevenData ? window.WitnessSevenUI.create({ data: window.WitnessSevenData, esc, drafts, getGame: game, getRoom: () => room, getModalKind: () => modalKind, send: engineAction, openModal, closeModal, render, modalHost, scene: Scene, privateVisible: () => privateVisible, setPrivateVisible: value => { privateVisible = value; privacyLocked = !value; }, isPending: () => pending, caseId, sessionGet, sessionSet, hidden: () => document.hidden, toast, isHost, practising }) : null;
+  function sevenGame(g = game()) { return !!Seven && g?.rulesVersion === 4; }
   function practising() { return !!window.WitnessPractice?.active(); }
 
   function sessionGet(key) { try { return sessionStorage.getItem(key) || ''; } catch (_) { return ''; } }
@@ -79,12 +81,12 @@
     return '<div class="intro-art" aria-hidden="true"><div class="art-circles"></div><span class="evidence-number">08</span><div class="dossier-art"><div class="art-portrait">' + portrait(4) + '<span class="art-bar">IDENTITY UNKNOWN</span></div><div class="blood-art"><svg viewBox="0 0 400 400" fill="currentColor"><path d="M270 0h130v240c-40-10-35-67-66-75-13-4-45 24-49 0-4-28 41-42 28-59-24-32-64 16-75-13-8-23 33-37 32-93Z"/></svg></div></div><div class="art-stamp">LAST WITNESS</div><div class="art-label">CASE FILE 0417 / ONLINE</div></div>';
   }
   function landing() {
-    const hero = '<section class="hero"><div class="hero-copy"><div class="eyebrow">ONLINE ASYMMETRIC MYSTERY</div><h1>마지막<span>목격자</span></h1><div class="hero-line"></div><p class="hero-description">각자의 화면에 숨겨진 진실.<br>다섯 번의 수사, 단 한 번의 고발.<br>친구들과 같은 사건에 접속하세요.</p><div class="hero-actions"><button class="btn primary" data-action="scroll-login">사건에 합류하기 ' + icon('arrow') + '</button><button class="btn outline" data-action="rules">게임 설명</button><button class="btn outline" data-action="practice-setup">로그인 없이 컴퓨터와 연습</button></div></div>' + introArt() + '</section><div class="intro-strip"><div class="intro-stat"><strong>2~6명</strong><span>각자의 기기로 참여</span></div><div class="intro-stat"><strong>초대 코드</strong><span>친구와 같은 방 접속</span></div><div class="intro-stat"><strong>5라운드</strong><span>공동 수사 매 라운드 1회</span></div><div class="intro-stat"><strong>개인 역할</strong><span>내 정보만 나에게</span></div></div>';
+    const hero = '<section class="hero"><div class="hero-copy"><div class="eyebrow">ONLINE ASYMMETRIC MYSTERY</div><h1>마지막<span>목격자</span></h1><div class="hero-line"></div><p class="hero-description">각자의 화면에 숨겨진 진실.<br>' + (Seven ? '일곱 날의 수사, 단 한 명의 진범.' : '다섯 번의 수사, 단 한 번의 고발.') + '<br>친구들과 같은 사건에 접속하세요.</p><div class="hero-actions"><button class="btn primary" data-action="scroll-login">사건에 합류하기 ' + icon('arrow') + '</button><button class="btn outline" data-action="rules">게임 설명</button><button class="btn outline" data-action="practice-setup">로그인 없이 컴퓨터와 연습</button></div></div>' + introArt() + '</section><div class="intro-strip"><div class="intro-stat"><strong>2~6명</strong><span>각자의 기기로 참여</span></div><div class="intro-stat"><strong>초대 코드</strong><span>친구와 같은 방 접속</span></div><div class="intro-stat"><strong>' + (Seven ? '7일 수사' : '5라운드') + '</strong><span>공동 수사 매일 1회</span></div><div class="intro-stat"><strong>개인 역할</strong><span>내 정보만 나에게</span></div></div>';
     let setup;
     if (restoring) setup = '<section class="online-card login-card" id="online-setup"><div class="eyebrow">RECONNECTING</div><h2>참여 중인 사건을 찾고 있습니다.</h2><p>잠시만 기다려 주세요. 새로고침한 접속을 복구하고 있습니다. 탭을 닫았다면 계정으로 다시 로그인해 돌아올 수 있습니다.</p></section>';
     else if (!token) setup = authCard();
     else setup = '<section id="online-setup"><div class="online-section-title"><div><div class="eyebrow">WELCOME, ' + esc(nickname) + '</div><h1>사건을 만들거나 합류하세요.</h1></div><span class="tag">' + (account ? '계정으로 접속 중' : '이전 참가자 접속') + '</span></div><div class="online-setup-grid"><section class="online-card"><div class="eyebrow">CREATE A ROOM</div><h2>새 사건의 방장이 되기</h2><p>최대 인원을 정하고 초대 링크를 공유하세요.<br>두 명 이상 모두 준비하면 시작할 수 있습니다.</p><div class="count-options" aria-label="방 최대 인원">' + [2, 3, 4, 5, 6].map(n => '<button class="count-button ' + (capacity === n ? 'selected' : '') + '" data-action="capacity" data-count="' + n + '" aria-pressed="' + (capacity === n) + '">' + n + '명</button>').join('') + '</div><button class="btn primary full" data-action="create" data-mutate' + disabled(false) + '>최대 ' + capacity + '명 방 만들기 ' + icon('arrow') + '</button></section><section class="online-card"><div class="eyebrow">JOIN AN INVITATION</div><h2>친구의 사건에 합류하기</h2><p>전달받은 여섯 자리 초대 코드를 입력하세요.</p><label class="field"><span>초대 코드</span><input class="join-code" id="join-code" data-draft="joinCode" maxlength="6" autocomplete="off" spellcheck="false" value="' + fieldValue('joinCode', inviteCode) + '" placeholder="ABC234"></label><button class="btn outline full" data-action="join" data-mutate' + disabled(false) + '>초대받은 방 입장</button></section></div></section>';
-    return shell('<div class="online-landing party-intro">' + hero + setup + '<section class="case-practice-entry"><h3>혼자 먼저 사건을 풀어보고 싶나요?</h3><p>가입 없이 컴퓨터 1~5명과 플레이할 수 있습니다. 탐정 또는 범인을 골라 실제 게임 흐름을 체험하세요.</p><button class="btn outline compact" data-action="practice-setup">컴퓨터 테스트 모드 시작</button></section><section class="online-how"><ol><li><strong>각자의 화면으로 접속</strong>방장이 초대 링크나 코드를 공유하면 모두 같은 방에 입장합니다.</li><li><strong>혼자 역할을 확인</strong>내 정보는 기본으로 가려집니다. 다른 참가자의 비밀 카드는 내 화면에 오지 않습니다.</li><li><strong>함께 추리하고 이야기</strong>순서대로 개인 행동을 마치고, 탐정의 수사와 자유 토론으로 진실을 좁힙니다.</li></ol></section></div>');
+    return shell('<div class="online-landing party-intro">' + hero + setup + '<section class="case-practice-entry"><h3>혼자 먼저 사건을 풀어보고 싶나요?</h3><p>가입 없이 컴퓨터 1~5명과 플레이할 수 있습니다. ' + (Seven ? '인원에 따라 탐정·범인·목격자·독립 용의자·공범을 골라 7일의 흐름을 체험하세요.' : '탐정 또는 범인을 골라 실제 게임 흐름을 체험하세요.') + '</p><button class="btn outline compact" data-action="practice-setup">컴퓨터 테스트 모드 시작</button></section><section class="online-how"><ol><li><strong>각자의 화면으로 접속</strong>방장이 초대 링크나 코드를 공유하면 모두 같은 방에 입장합니다.</li><li><strong>혼자 역할을 확인</strong>내 정보는 기본으로 가려집니다. 다른 참가자의 비밀 카드는 내 화면에 오지 않습니다.</li><li><strong>함께 추리하고 이야기</strong>순서대로 개인 행동을 마치고, 탐정의 수사와 자유 토론으로 진실을 좁힙니다.</li></ol></section></div>');
   }
 
   function lobby() {
@@ -110,10 +112,12 @@
   function investigation(g) { return U.investigation(g, tab); }
   function discussion(g) { return U.chat(g, chatOpen); }
   function publicGame(g) {
+    if (sevenGame(g)) return shell(Seven.render(g, room));
     const possible = G.candidates(g);
     return shell('<div class="party-game online-public-board"><div class="online-section-title"><div><div class="eyebrow">' + (practising() ? 'COMPUTER PRACTICE' : 'ROOM ' + esc(room.code)) + ' / DAY-' + String(g.round).padStart(2, '0') + '</div><h1>남은 진술, 다섯 번의 수사.</h1></div><span class="tag">' + room.members.length + '명 사건</span></div>' + roster(g) + turnBanner(g) + personalPanel(g) + '<div class="game-layout"><div><div class="public-status"><div><strong>' + g.round + ' / 5</strong><span>현재 라운드</span></div><div><strong>' + (['reveal', 'secret', 'investigate'].includes(g.phase) ? '1 / 1' : '0 / 1') + '</strong><span>남은 공동 수사</span></div><div><strong>' + g.kits + ' / 1</strong><span>감식·검증 공용 기회</span></div></div>' + board(g, possible) + '</div><aside class="side-panel"><div class="eyebrow">SHARED PUBLIC RECORD</div><h2>모두의 수사 기록</h2><p>가능한 사건 <b style="color:var(--gold)">' + possible.length + ' / 32</b><br>공식 답변의 거짓은 진영 합계 최대 2개입니다.</p><div class="mini-heading">OFFICIAL EVIDENCE / 공식 증거</div><div class="record-scroll">' + factsHTML(g) + '</div><div class="mini-heading">FORMAL STATEMENTS / 공식 진술</div><div class="record-scroll">' + claimsHTML(g) + '</div><button class="btn compact outline full" data-action="ledger">' + icon('notebook') + ' 수사기록 열기</button><button class="text-button" data-action="clear-marks">내 제외 메모 초기화</button><p class="online-footer-note">미공개 단서와 자유 발언은 자동 후보 계산에 사용하지 않습니다.</p></aside></div></div>');
   }
   function result(g) {
+    if (sevenGame(g)) return shell(Seven.result(g));
     const r = g.reveal, secret = r.secret, win = g.winner === 'investigators';
     return shell('<div class="result party-result online-result"><header class="result-header"><span class="result-seal">' + (win ? 'CASE CLOSED' : 'CASE UNSOLVED') + '</span><h1>' + (win ? '수사 진영의 승리' : '범인 진영의 승리') + '</h1><p>' + (win ? '사건 인물과 장소를 모두 맞혔습니다. 탐정·목격자·용의자가 함께 승리합니다.' : '최종 고발이 빗나갔습니다. 범인과 공범이 함께 승리합니다.') + '</p></header>' + replaySummary(g) + '<div class="case-solution"><article class="solution-card"><span class="eyebrow">실제 사건 인물</span><div class="solution-portrait"><div class="portrait">' + portrait(G.SUSPECTS.findIndex(p => p.id === secret.suspectId)) + '</div></div><h2>' + npc(secret.suspectId).name + '</h2><p>' + npc(secret.suspectId).bits.map((b, i) => G.CATEGORIES[i].values[b]).join(' · ') + '</p></article><article class="solution-card"><span class="eyebrow">실제 범행 장소</span><div class="result-location place" data-place="' + secret.placeId + '" style="height:160px;margin-top:16px"></div><h2>' + place(secret.placeId).name + '</h2><p>' + place(secret.placeId).bits.map((b, i) => G.CATEGORIES[i + 3].values[b]).join(' · ') + '</p></article></div><div class="banner ' + (win ? 'success' : 'error') + '"><p>탐정의 고발: <b>' + npc(g.accusation.suspectId).name + ' / ' + place(g.accusation.placeId).name + '</b><br>' + g.round + '라운드에서 사건 종료</p></div><div class="divider-title"><h2>모든 역할과 진영 공개</h2></div><div class="result-roles">' + r.players.map(p => '<article class="result-role case-result-role ' + (G.ROLES[p.role].team === g.winner ? 'winner' : 'loser') + '"><div class="role-art" data-role="' + p.role + '" aria-hidden="true"></div><h3>' + esc(p.name) + ' · ' + roleLabel(p.role) + '</h3><p>' + (G.ROLES[p.role].team === 'criminals' ? '범인 진영' : '수사 진영') + '</p>' + '<b class="case-team-result">' + (G.ROLES[p.role].team === g.winner ? 'WIN · 공동 승리' : 'LOSE · 진영 패배') + '</b>' + '</article>').join('') + '</div><div class="divider-title"><h2>공식 진술의 진상</h2></div>' + (g.statements.length ? g.statements.map(s => '<div class="record-card claim"><span class="record-label">R' + s.round + ' · ' + esc(playerName(s.speakerId, g)) + '</span><p>' + factText(s.category, s.value) + '</p><small>' + (s.value === truth(secret, s.category) ? '진실' : '거짓 · 실제 ' + category(s.category).values[truth(secret, s.category)]) + '</small></div>').join('') : '<p class="empty">공식 진술 없이 사건이 끝났습니다.</p>') + '<div class="result-actions">' + (isHost() ? '<button class="btn primary" data-action="restart" data-mutate' + disabled(false) + '>같은 참가자로 새 사건 준비</button>' : '<p class="public-warning">방장이 새 사건 준비를 누르면 함께 대기실로 돌아갑니다.</p>') + '<button class="btn outline" data-action="leave">방 나가기</button></div></div>');
   }
@@ -124,6 +128,7 @@
     return '<section class="case-self-launch case-replay-launch" aria-label="종료된 사건 복기"><div><small>CASE REPLAY / 사건의 뒷면</small><h2>사건 복기</h2><p class="case-caption">질문 ' + stats.questions + '회 · 거짓 공식 답변 ' + stats.lies + '개 · 당시 진술 검증 ' + stats.verified + '회</p></div><button class="btn outline" data-action="replay-open">' + icon('notebook') + '사건 복기 보기</button></section>';
   }
   function openReplay() {
+    if (sevenGame()) { Seven.handle('seven-replay'); return; }
     const g = game(); if (room?.status !== 'finished' || g?.phase !== 'finished' || !g.reveal || Scene?.busy()) return;
     if (replayRound !== 'all' && (!Number.isInteger(replayRound) || replayRound < 1 || replayRound > g.round)) replayRound = 'all';
     const list = Replay.events(g, replayRound);
@@ -172,8 +177,8 @@
     const changed = changedRoom || old?.revision !== nextRoom?.revision || old?.status !== nextRoom?.status || phaseChanged;
     room = nextRoom;
     const resetDrafts = changedRoom || old?.status === 'finished' && nextRoom?.status === 'lobby';
-    if (resetDrafts) { Scene?.cancel(); activeStoryKey = ''; autoCueKey = ''; replayRound = 'all'; replayIndex = 0; privacyLocked = true; privateVisible = false; marksS.clear(); marksP.clear(); Object.keys(drafts).forEach(k => { if (!['nickname', 'joinCode'].includes(k)) delete drafts[k]; }); closeModal(); }
-    if (phaseChanged) { privateVisible = false; if (modalKind && !activeNotice && !['register', 'logout'].includes(modalKind)) closeModal(); }
+    if (resetDrafts) { Seven?.reset(); Scene?.cancel(); activeStoryKey = ''; autoCueKey = ''; replayRound = 'all'; replayIndex = 0; privacyLocked = true; privateVisible = false; marksS.clear(); marksP.clear(); Object.keys(drafts).forEach(k => { if (!['nickname', 'joinCode'].includes(k)) delete drafts[k]; }); closeModal(); }
+    if (phaseChanged) { if (modalKind !== 'seven-notice') privateVisible = false; if (modalKind && !activeNotice && !['register', 'logout', 'seven-story', 'seven-notice'].includes(modalKind)) closeModal(); }
     if (room?.status === 'finished') privateVisible = false;
     if (changed || force) render(resetDrafts); else { updatePresence(); updateConnection(); }
     if (changed || force) pumpCaseCues();
@@ -248,13 +253,14 @@
   }
 
   function openModal(kind, title, body) {
+    const modern = kind.startsWith('seven-');
     lastFocus = document.activeElement; modalKind = kind;
-    modalHost.innerHTML = '<div class="modal-root ' + (['personal', 'review', 'obstruction', 'practice', 'replay'].includes(kind) ? 'case-modal-root' : '') + '"><section class="modal" role="dialog" aria-modal="' + (!['personal', 'review', 'obstruction'].includes(kind)) + '" aria-labelledby="modal-title"><header class="modal-head">' + (['personal', 'review'].includes(kind) ? '<button class="case-ledger-launch" data-action="ledger" aria-label="종이와 펜 · 수사기록 열기">' + icon('notebook') + '<span>수사기록</span></button>' : '') + '<div><div class="eyebrow">LAST WITNESS / ONLINE</div><h2 id="modal-title">' + title + '</h2></div><button class="close-btn" data-action="close-modal" aria-label="닫기">×</button></header>' + body + '</section></div>';
+    modalHost.innerHTML = '<div class="modal-root ' + (modern || ['personal', 'review', 'obstruction', 'practice', 'replay'].includes(kind) ? 'case-modal-root' : '') + '"><section class="modal" role="dialog" aria-modal="' + (!['personal', 'review', 'obstruction', 'seven-personal', 'seven-review'].includes(kind)) + '" aria-labelledby="modal-title"><header class="modal-head">' + (['personal', 'review', 'seven-personal', 'seven-review'].includes(kind) ? '<button class="case-ledger-launch" data-action="ledger" aria-label="종이와 펜 · 수사기록 열기">' + icon('notebook') + '<span>수사기록</span></button>' : '') + '<div><div class="eyebrow">LAST WITNESS / ONLINE</div><h2 id="modal-title">' + title + '</h2></div><button class="close-btn" data-action="close-modal" aria-label="닫기">×</button></header>' + body + '</section></div>';
     document.body.style.overflow = 'hidden'; modalHost.querySelector('button,select,input,textarea')?.focus();
   }
   function clearPasswordFields() { ['password', 'password-confirm'].forEach(id => { const input = document.getElementById(id); if (input) input.value = ''; }); }
   function updateAuthError() { document.querySelectorAll('[data-auth-error]').forEach(el => { el.textContent = authError; el.hidden = !authError; }); }
-  function closeModal() { activeNotice?.handle?.cancel?.(); activeNotice = null; reviewLetterKey = ''; letterHandles.forEach(h => h.cancel?.()); letterHandles = []; modalSignature = ''; clearPasswordFields(); modalHost.innerHTML = ''; modalKind = null; document.body.style.overflow = ''; if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true }); }
+  function closeModal() { Seven?.onClose(); activeNotice?.handle?.cancel?.(); activeNotice = null; reviewLetterKey = ''; letterHandles.forEach(h => h.cancel?.()); letterHandles = []; modalSignature = ''; clearPasswordFields(); modalHost.innerHTML = ''; modalKind = null; document.body.style.overflow = ''; if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true }); }
   function upgradeModal() {
     if (!token || account) return;
     privateVisible = false; authError = ''; render();
@@ -291,9 +297,10 @@
   }
   function settings() { openModal('settings', '분위기 조절', '<p class="small subtle">원본 누아르 이미지 위로 연기·먼지·잔불이 움직입니다. 배경음악은 오른쪽 아래에서 따로 조절하세요.</p><div class="fx-settings"><label class="check-label">효과 품질 <select id="quality" data-change="quality">' + [['high', '고품질'], ['low', '저사양'], ['off', '끔']].map(([value, text]) => '<option value="' + value + '"' + (quality === value ? ' selected' : '') + '>' + text + '</option>').join('') + '</select></label><label class="check-label"><input type="checkbox" data-change="gore"' + (gore ? ' checked' : '') + '> 혈흔 오버레이</label></div><p class="online-footer-note">혈흔 오버레이를 꺼도 생성 배경에 그려진 사건 흔적은 남습니다.</p>'); }
   function applyFX() { document.body.classList.toggle('gore-off', !gore); document.body.classList.toggle('fx-off', quality === 'off'); document.body.classList.toggle('fx-high', quality === 'high'); FX?.setQuality?.(quality); }
-  function privacy() { privacyLocked = true; if (activeNotice && game()?.self.role === 'culprit') closeModal(); if (privateVisible) { privateVisible = false; render(); } }
-  function ledger() { ledgerReturn = ['personal', 'review'].includes(modalKind); const g = game(), possible = G.candidates(g); openModal('ledger', '공식 기록과 후보 조합', '<div class="rules-content"><h3>공식 증거 · 항상 진실</h3>' + factsHTML(g) + '<h3>공식 진술 · 거짓은 합계 최대 2회</h3>' + claimsHTML(g) + '<h3>공개 기록 기준 후보 ' + possible.length + '개</h3><div class="candidate-list">' + possible.map(c => '<span class="tag">' + npc(c.suspectId).name + ' / ' + place(c.placeId).name + '</span>').join('') + '</div><p class="online-footer-note">개인 화면에만 있는 단서와 자유 발언, 내 제외 메모는 후보 계산에 넣지 않습니다.</p><h3>진행 기록</h3>' + g.log.map(l => '<p class="small subtle">R' + l.round + ' · ' + esc(l.text) + '</p>').join('') + '</div>'); }
+  function privacy() { privacyLocked = true; if (sevenGame()) Seven.privacy(); if (activeNotice && game()?.self.role === 'culprit') closeModal(); if (privateVisible) { privateVisible = false; render(); } }
+  function ledger() { if (sevenGame()) { Seven.handle('seven-ledger'); return; } ledgerReturn = ['personal', 'review'].includes(modalKind); const g = game(), possible = G.candidates(g); openModal('ledger', '공식 기록과 후보 조합', '<div class="rules-content"><h3>공식 증거 · 항상 진실</h3>' + factsHTML(g) + '<h3>공식 진술 · 거짓은 합계 최대 2회</h3>' + claimsHTML(g) + '<h3>공개 기록 기준 후보 ' + possible.length + '개</h3><div class="candidate-list">' + possible.map(c => '<span class="tag">' + npc(c.suspectId).name + ' / ' + place(c.placeId).name + '</span>').join('') + '</div><p class="online-footer-note">개인 화면에만 있는 단서와 자유 발언, 내 제외 메모는 후보 계산에 넣지 않습니다.</p><h3>진행 기록</h3>' + g.log.map(l => '<p class="small subtle">R' + l.round + ' · ' + esc(l.text) + '</p>').join('') + '</div>'); }
   function accuseModal() {
+    if (sevenGame()) { Seven.openPersonal(); return; }
     const g = game(); if (!g || g.self.role !== 'detective' || !(g.phase === 'final' || g.phase === 'discussion' || g.phase === 'investigate' && g.round < 5)) return;
     const possible = window.WitnessDetectiveOptions.accusationCandidates(g), suspects = possible.suspects.filter(s => !marksS.has(s.id)), places = possible.places.filter(p => !marksP.has(p.id));
     openModal('accuse', '탐정의 최종 고발', '<p class="small subtle">공식 증거와 나의 참 단서, 내 제외 메모를 반영한 후보만 표시합니다. 인물과 장소 중 하나라도 틀리면 범인 진영이 승리하며 고발은 한 번뿐입니다.</p><div class="form-grid"><label class="field"><span>사건 인물 · 참가자 역할과 별개</span><select id="accuse-person" data-change="accuse"><option value="">선택하세요</option>' + options(suspects) + '</select></label><label class="field"><span>범행 장소</span><select id="accuse-place" data-change="accuse"><option value="">선택하세요</option>' + options(places) + '</select></label></div>' + (!suspects.length || !places.length ? '<div class="notice">내 제외 메모 때문에 선택할 후보가 없습니다. 메모를 다시 검토하거나 초기화하세요.<button class="text-button" data-action="clear-marks">내 제외 메모 초기화</button></div>' : '') + '<div class="notice">내 제외 메모는 나의 판단이며 확정 증거가 아닙니다. 확정하면 진상과 모든 역할이 모두에게 공개됩니다.</div><div class="modal-actions"><button class="btn outline" data-action="close-modal">기록 더 보기</button><button class="btn danger" id="confirm-accuse" data-action="confirm-accuse" data-mutate disabled>최종 고발 확정</button></div>');
@@ -327,6 +334,7 @@
     }
   }
   function refreshCaseModal(force = false) {
+    if (sevenGame()) { Seven.refresh(force); return; }
     const g = game();
     if (!g || !['personal', 'review'].includes(modalKind)) return;
     const next = JSON.stringify([modalKind, privateVisible, pending, tab, g.phase, g.round, g.turnOwnerId, g.self, g.caseSecret, g.kits, g.remainingLies, g.sabotage, g.pending, g.review, g.facts, g.statements, drafts.questionCategory, drafts.questionTarget, drafts.questionProposed]);
@@ -339,12 +347,14 @@
     animateLetters();
   }
   function openPersonal() {
+    if (sevenGame()) { Seven.openPersonal(); return; }
     const g = game(); if (!g || room.status !== 'playing') return;
     if (g.self.role === 'detective' && g.phase === 'discussion') { openReview(); return; }
     if (modalKind !== 'personal') openModal('personal', g.phase === 'answer' && mine(g) ? '탐정의 질문' : mine(g) && g.phase !== 'reveal' ? '나의 차례 · 사건 수첩' : '나만 보는 개인 화면', '<div id="case-window-body"></div>');
     modalSignature = ''; refreshCaseModal();
   }
   function openReview() {
+    if (sevenGame()) { Seven.openReview(); return; }
     const g = game(); if (!g || g.self.role !== 'detective' || g.phase !== 'discussion') return;
     if (modalKind !== 'review') openModal('review', '도착한 수사 결과', '<div id="case-window-body"></div>');
     modalSignature = ''; refreshCaseModal();
@@ -363,6 +373,7 @@
     else { privateVisible = !privacyLocked && !document.hidden; openPersonal(); }
   }
   function pumpCaseCues() {
+    if (sevenGame()) { Seven.pump(); return; }
     const g = game(); if (!g || document.hidden || room.status === 'lobby') return;
     if (activeNotice || Scene?.busy()) return;
     if (showCaseNotice(g)) return;
@@ -410,14 +421,16 @@
     sessionSet(activeNotice.key, '1'); closeModal(); pumpCaseCues();
   }
   function practiceSetup() {
-    openModal('practice', '컴퓨터와 사건 연습', '<div class="case-practice-options"><p class="case-practice-note">로그인 없이 실제 규칙으로 연습합니다. 나를 제외한 참가자는 컴퓨터가 맡습니다. 연습 상태는 이 탭에서만 유지됩니다.</p><div><h3>나를 포함한 참가 인원</h3><div class="count-options">' + [2,3,4,5,6].map(n => '<button class="count-button ' + (practiceCount === n ? 'selected' : '') + '" data-action="practice-count" data-count="' + n + '" aria-pressed="' + (practiceCount === n) + '">' + n + '명</button>').join('') + '</div></div><div><h3>나의 역할</h3><div class="case-practice-role">' + [['detective','탐정'],['culprit','범인'],['random','무작위']].map(([id,label]) => '<button class="' + (practiceRole === id ? 'selected' : '') + '" data-action="practice-role" data-role="' + id + '" aria-pressed="' + (practiceRole === id) + '">' + label + '</button>').join('') + '</div></div><button class="btn primary full" data-action="practice-start">연습 사건 시작 ' + icon('arrow') + '</button></div>');
+    const roles = Seven ? [['detective','탐정'],['culprit','범인'], ...(practiceCount >= 3 ? [['witness','목격자']] : []), ...(practiceCount >= 4 ? [['suspect','독립 용의자 S']] : []), ...(practiceCount === 6 ? [['accomplice','공범']] : []), ['random','무작위']] : [['detective','탐정'],['culprit','범인'],['random','무작위']];
+    if (!roles.some(([id]) => id === practiceRole)) practiceRole = 'detective';
+    openModal('practice', '컴퓨터와 사건 연습', '<div class="case-practice-options"><p class="case-practice-note">로그인 없이 실제 규칙으로 연습합니다. 나를 제외한 참가자는 컴퓨터가 맡습니다. 연습 상태는 이 탭에서만 유지됩니다.</p><div><h3>나를 포함한 참가 인원</h3><div class="count-options">' + [2,3,4,5,6].map(n => '<button class="count-button ' + (practiceCount === n ? 'selected' : '') + '" data-action="practice-count" data-count="' + n + '" aria-pressed="' + (practiceCount === n) + '">' + n + '명</button>').join('') + '</div></div><div><h3>나의 역할</h3><div class="case-practice-role">' + roles.map(([id,label]) => '<button class="' + (practiceRole === id ? 'selected' : '') + '" data-action="practice-role" data-role="' + id + '" aria-pressed="' + (practiceRole === id) + '">' + label + '</button>').join('') + '</div></div><button class="btn primary full" data-action="practice-start">연습 사건 시작 ' + icon('arrow') + '</button></div>');
   }
   async function startPractice() {
     if (pending || practising()) return;
     if (!window.WitnessPractice) { toast('연습 파일을 준비하지 못했습니다. 새로고침해 주세요.'); return; }
     captureDrafts(); practiceSnapshot = { room, account, nickname, connection, connectionText, restoring }; clearTimeout(pollTimer); generation += 1; replayRound = 'all'; replayIndex = 0;
     Scene?.cancel(); activeStoryKey = ''; autoCueKey = ''; privateVisible = false; privacyLocked = true; chatOpen = false; chatReadCount = 0; closeModal();
-    const data = await window.WitnessPractice.start({ count: practiceCount, role: practiceRole, name: '플레이어', onChange: data => { if (practising()) acceptRoom(data.room); } });
+    const data = await window.WitnessPractice.start({ count: practiceCount, role: practiceRole, ...(Seven ? { rulesVersion: 4 } : {}), name: '플레이어', onChange: data => { if (practising()) acceptRoom(data.room); } });
     connection = 'online'; connectionText = '로컬 연습 중'; restoring = false; acceptRoom(data.room, true); schedulePoll();
   }
   async function stopPractice() {
@@ -427,6 +440,7 @@
   }
 
   async function act(action, button) {
+    if (sevenGame() && await Seven.handle(action, button?.dataset)) return;
     if (activeNotice && !['notice-finish', 'notice-continue', 'chat-toggle', 'send-note', 'refresh', 'practice-exit', 'logout-confirm', 'restart', 'leave-confirm'].includes(action)) { if (action === 'close-modal') finishNotice(); return; }
     const d = button?.dataset || {};
     if (action === 'notice-finish') { activeNotice?.handle?.finish?.(); return; }
@@ -443,10 +457,10 @@
     else if (action === 'logout' || action === 'change-name') logoutModal();
     else if (action === 'logout-confirm') { const data = await mutate('logout'); if (data) { closeModal(); render(); } }
     else if (action === 'capacity') { capacity = Number(d.count); render(); }
-    else if (action === 'create') await mutate('create', { capacity });
+    else if (action === 'create') await mutate('create', { capacity, ...(Seven ? { rulesVersion: 4 } : {}) });
     else if (action === 'join') { const code = ($('#join-code')?.value || inviteCode || '').trim().toUpperCase(); if (!/^[A-Z2-9]{6}$/.test(code)) { toast('초대 코드 여섯 자리를 확인해 주세요.'); return; } await mutate('join', { code }); }
     else if (action === 'ready') await mutate('ready', { ready: !ready });
-    else if (action === 'start') await mutate('start');
+    else if (action === 'start') await mutate('start', Seven ? { rulesVersion: 4 } : {});
     else if (action === 'copy-invite') await copyInvite();
     else if (action === 'connection-help') openModal('connection', '접속을 잠시 벗어날 때', '<p class="small subtle">게임이 진행 중일 때 방과 역할은 유지됩니다. 탭을 닫거나 로그아웃했더라도 같은 계정으로 로그인하면 현재 자리로 돌아옵니다. 로그인 접속은 24시간 유효하며, 만료되면 다시 로그인하면 됩니다. 방 기록은 마지막 플레이부터 최대 30일 보관됩니다.</p><p class="online-footer-note">내 비밀 정보는 창을 벗어날 때 가려집니다. 다른 참가자는 현재 차례를 기다리게 되므로 잠시 자리를 비우면 함께하는 사람에게 알려 주세요.</p>');
     else if (action === 'refresh') await poll();
@@ -496,7 +510,7 @@
 
   document.addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (!button || button.disabled) return; const action = button.dataset.action; Promise.resolve(act(action, button)).catch(() => toast('요청을 완료하지 못했습니다. 최신 상태를 확인해 주세요.')); if (gore && quality !== 'off' && !['private-toggle', 'close-modal'].includes(action)) FX?.burst?.(event.clientX, event.clientY, 'blood'); });
   document.addEventListener('input', event => { if (event.target.dataset.draft && event.target.type !== 'password' && !/password/i.test(event.target.dataset.draft)) drafts[event.target.dataset.draft] = event.target.value; });
-  document.addEventListener('change', event => { const el = event.target; if (el.dataset.draft && el.type !== 'password' && !/password/i.test(el.dataset.draft)) drafts[el.dataset.draft] = el.value; if (el.dataset.change === 'quality') { quality = el.value; applyFX(); } else if (el.dataset.change === 'gore') { gore = el.checked; applyFX(); } else if (el.id === 'question-category' || el.id === 'question-target' || el.id === 'question-proposed') { captureDrafts(); refreshCaseModal(true); } else if (el.dataset.change === 'accuse') { const button = $('#confirm-accuse'); if (button) button.disabled = pending || !$('#accuse-person').value || !$('#accuse-place').value; } });
+  document.addEventListener('change', event => { const el = event.target; if (el.dataset.draft && el.type !== 'password' && !/password/i.test(el.dataset.draft)) drafts[el.dataset.draft] = el.value; if (el.dataset.change === 'quality') { quality = el.value; applyFX(); } else if (el.dataset.change === 'gore') { gore = el.checked; applyFX(); } else if (el.id === 'seven-question-category') { captureDrafts(); delete drafts['seven-question-proposed']; refreshCaseModal(true); } else if (el.id === 'question-category' || el.id === 'question-target' || el.id === 'question-proposed') { captureDrafts(); refreshCaseModal(true); } else if (el.dataset.change === 'accuse') { const button = $('#confirm-accuse'); if (button) button.disabled = pending || !$('#accuse-person').value || !$('#accuse-place').value; } });
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') { if (Scene?.busy()) return; if (activeNotice) { event.preventDefault(); finishNotice(); return; } if (modalKind) { ledgerReturn = false; closeModal(); } privacy(); }
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && event.target.id === 'chat-text') { event.preventDefault(); act('send-note'); }

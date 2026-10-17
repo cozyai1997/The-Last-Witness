@@ -1,0 +1,210 @@
+{
+  "version": 4,
+  "created": "2026-10-17",
+  "mapping": "row-major; original eight portraits remain unchanged in suspects-atlas",
+  "assets": [
+    {
+      "id": "portraits-v4",
+      "generator": "GPT image generation (built-in image_gen)",
+      "original": ".IMG/portraits-v4.png",
+      "web": "public/images/portraits-v4.webp",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "atlas": {
+        "columns": 2,
+        "rows": 2,
+        "order": [
+          "s8 오지안",
+          "s9 문재희",
+          "s10 임하준",
+          "s11 배서윤"
+        ]
+      },
+      "originalSha256": "f0ec225ce0a46d68461c9c3c9535e77d15b9511cf18db09a2b8e3fb01cd860e7",
+      "webSha256": "cb345f2c0c053468754ffa140c8d6fa415a719fd00b4e113738b5934aba9caca",
+      "originalBytes": 2254113,
+      "webBytes": 154930,
+      "activeInFinalUI": true
+    },
+    {
+      "id": "locations-v4",
+      "generator": "GPT image generation (built-in image_gen)",
+      "original": ".IMG/locations-v4.png",
+      "web": "public/images/locations-v4.webp",
+      "dimensions": [
+        1774,
+        887
+      ],
+      "atlas": {
+        "columns": 3,
+        "rows": 2,
+        "order": [
+          "p0 중앙전시실",
+          "p1 기록보관실",
+          "p2 연결회랑",
+          "p3 복원작업실",
+          "p4 중앙정원",
+          "p5 직원하역장"
+        ]
+      },
+      "originalSha256": "7074d75c4a96296304136554d762f50deb05c3cad2bfd02b3884b9c8f68bad0f",
+      "webSha256": "39eb3b98016b9879c844a5e3081335cb311bea864539ba03b83161e86ee61dda",
+      "originalBytes": 2573048,
+      "webBytes": 366626,
+      "activeInFinalUI": false
+    },
+    {
+      "id": "tools-v4",
+      "generator": "GPT image generation (built-in image_gen)",
+      "original": ".IMG/tools-v4.png",
+      "web": "public/images/tools-v4.webp",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "atlas": {
+        "columns": 2,
+        "rows": 2,
+        "order": [
+          "t0 서류칼",
+          "t1 청동상",
+          "t2 전시용 고정끈",
+          "t3 약품"
+        ]
+      },
+      "originalSha256": "9f91d2a4a877ea946650c65a8c5fccf45a0d18f46117b330c0b47344cf5ff50e",
+      "webSha256": "5c6e3dfec7705a280366cd78a23008febdb083df52b56a5b0d38e49e7d7a095d",
+      "originalBytes": 2447248,
+      "webBytes": 274952,
+      "activeInFinalUI": false
+    },
+    {
+      "id": "identity-v4",
+      "generator": "GPT image generation (built-in image_gen)",
+      "original": ".IMG/identity-v4.png",
+      "web": "public/images/identity-v4.webp",
+      "dimensions": [
+        941,
+        1672
+      ],
+      "atlas": {
+        "columns": 1,
+        "rows": 1,
+        "order": [
+          "anonymous identity dossier; no identifiable character"
+        ]
+      },
+      "originalSha256": "fc75ca1ea3974eab508b38e9455a15606981fba3b8e4cca469a692ad55831302",
+      "webSha256": "fa95507a8e9f2f08cf6ce888681be5a0e04f5c697a551bf2ebffa8d37f101bab",
+      "originalBytes": 2251330,
+      "webBytes": 220456,
+      "activeInFinalUI": true
+    },
+    {
+      "id": "locations-v4-12",
+      "generator": "GPT image generation (built-in image_gen)",
+      "original": ".IMG/locations-v4-12.png",
+      "web": "public/images/locations-v4-12.webp",
+      "dimensions": [
+        1448,
+        1086
+      ],
+      "atlas": {
+        "columns": 4,
+        "rows": 3,
+        "order": [
+          "p0 중앙전시실",
+          "p1 기록보관실",
+          "p2 연결회랑",
+          "p3 복원작업실",
+          "p4 중앙정원",
+          "p5 직원하역장",
+          "p6 기획전시실",
+          "p7 관장실",
+          "p8 교육체험실",
+          "p9 수장고",
+          "p10 조각산책로",
+          "p11 설비관리동"
+        ]
+      },
+      "activeInFinalUI": true,
+      "originalSha256": "8c7d0835f84205e0bb6358121fd5ab9c6f380a3144a3d08e313953f109e269f2",
+      "webSha256": "c9f7abe9e4139efd42e060d255296a505a0678b8e8844e7761fb5b80c5644229",
+      "originalBytes": 2899821,
+      "webBytes": 436508
+    },
+    {
+      "id": "tools-v4-12",
+      "generator": "GPT image generation (built-in image_gen)",
+      "original": ".IMG/tools-v4-12.png",
+      "web": "public/images/tools-v4-12.webp",
+      "dimensions": [
+        1448,
+        1086
+      ],
+      "atlas": {
+        "columns": 4,
+        "rows": 3,
+        "order": [
+          "t0 서류칼",
+          "t1 청동상",
+          "t2 전시용 고정끈",
+          "t3 약품",
+          "t4 금속 손전등",
+          "t5 보존용 나무망치",
+          "t6 황동 촛대",
+          "t7 석고 모형",
+          "t8 유리 문진",
+          "t9 수장고 열쇠 묶음",
+          "t10 전시용 쇠사슬",
+          "t11 대리석 받침"
+        ]
+      },
+      "activeInFinalUI": true,
+      "originalSha256": "1b5e788ba13c05d56319c150fbe710d9e41a574214d9a2d2f93b6dbe4f5f0424",
+      "webSha256": "79a32aca412e487312ae640c1fd03b51b32cf156378e0a3086198d86321db92e",
+      "originalBytes": 2944469,
+      "webBytes": 410622
+    },
+    {
+      "id": "times-v4-12",
+      "generator": "GPT image generation (built-in image_gen)",
+      "original": ".IMG/times-v4-12.png",
+      "web": "public/images/times-v4-12.webp",
+      "dimensions": [
+        1448,
+        1086
+      ],
+      "atlas": {
+        "columns": 4,
+        "rows": 3,
+        "order": [
+          "time0 18:00–18:15",
+          "time1 18:15–18:30",
+          "time2 18:30–18:45",
+          "time3 18:45–19:00",
+          "time4 19:00–19:15",
+          "time5 19:15–19:30",
+          "time6 19:30–19:45",
+          "time7 19:45–20:00",
+          "time8 20:00–20:15",
+          "time9 20:15–20:30",
+          "time10 20:30–20:45",
+          "time11 20:45–21:00"
+        ]
+      },
+      "activeInFinalUI": true,
+      "originalSha256": "6be3716957f58939d5f888306c7e60581eabc6c707dfccbe95561ddb09c04318",
+      "webSha256": "2c3bbffe2429b33120bdf39748c03a59a7aad159a653093a14c8b5a4cb5c7610",
+      "originalBytes": 2815168,
+      "webBytes": 387630
+    }
+  ],
+  "catalogCounts": {
+    "p": 12,
+    "t": 12,
+    "h": 12
+  }
+}
