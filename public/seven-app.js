@@ -15,19 +15,27 @@
     '여섯 번째 날, 봉인 제보의 마지막 기회가 다가온다. 각자의 선택은 각자의 수첩에 남고, 탐정의 수사는 계속된다.',
     '일곱 번째 날이다. 오늘의 수사와 답변 검토를 마치면 탐정은 사건 인물 한 명을 최종 고발한다. 장소·도구·시간의 흔적을 인물과 연결해 보고 마지막 말을 나눈다.'
   ];
-  const EVENT_NAMES = { 'blocked-search': '봉쇄된 원본 열람', 'investigate-pass': '공식 수사 넘김', 'identity-guess': '정체 추정 메모', 'initial-clue': '처음 받은 관찰', 'role-seen': '역할 확인', memory: '기억 복원', report: '봉인 제보', suggest: '수사 방향 제안', guard: '기록 보호', seal: '기록 봉쇄', 'seal-result': '봉쇄 결과', question: '공식 질문', answer: '공식 답변', unknown: '미진술', 'blocked-question': '전달되지 않은 질문', search: '원본 기록 수사', audit: '진술 검증', 'review-audit': '현재 답변 검증', 'round-confirm': '하루의 검토 완료', accusation: '최종 고발', pass: '행동 넘김', 'secret-pass': '개인행동 넘김', note: '자유 발언' };
+  const EVENT_NAMES = { 'blocked-search': '봉쇄된 원본 열람', 'investigate-pass': '공식 수사 넘김', 'identity-guess': '정체 추정 메모', 'initial-clue': '처음 받은 관찰', 'role-seen': '역할 확인', memory: '기억 복원', report: '봉인 제보', suggest: '수사 방향 제안', guard: '기록 보호', seal: '기록 봉쇄', 'seal-result': '봉쇄 결과', question: '공식 질문', answer: '공식 답변', unknown: '미진술', 'blocked-question': '전달되지 않은 질문', search: '원본 기록 수사', audit: '진술 검증', 'review-audit': '현재 답변 검증', 'round-confirm': '하루의 검토 완료', accusation: '최종 고발', pass: '행동 넘김', 'secret-pass': '개인행동 넘김', 'prepare-ready': '비밀 준비 완료', 'testimony-offer': '증언 신청', note: '자유 발언' };
   const PHASES = { reveal: '역할 확인', secret: '개인행동', investigate: '공식 수사', answer: '공식 답변', discussion: '답변·기록 검토', final: '최종 고발', finished: '사건 종료' };
   function create(config) {
     config = config || {};
     const D = config.data, esc = config.esc || (value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])));
     if (!D) throw new TypeError('7일 사건의 공개 자료가 필요합니다.');
     const drafts = config.drafts || Object.create(null), marked = { person: new Set(), place: new Set(), tool: new Set(), time: new Set() };
-    let boardTab = 'person', detailSelection = null, sealNotice = null, selectedTab = 'question', replayDay = 'all', replayStep = 0, cueKey = '', storyCase = '', endingShown = '', modalSignature = '', typedKey = '', handles = [];
+    const actions = config.actions || (typeof globalThis !== 'undefined' ? globalThis.WitnessSevenActions : null);
+    let boardTab = 'person', detailSelection = null, actionNotebook = null, privatePane = 'actions', secretPane = 'memory', sealNotice = null, selectedTab = 'question', replayDay = 'all', replayStep = 0, cueKey = '', storyCase = '', endingShown = '', modalSignature = '', typedKey = '', handles = [];
     const typed = new Set(), readNotices = new Set();
-    const serverActions = new Set(['role-seen', 'memory', 'report-submit', 'identity-guess', 'guard', 'seal', 'suggest', 'secret-pass', 'answer', 'question', 'search', 'audit', 'investigate-pass', 'review-audit', 'round-confirm', 'accuse-submit']);
+    const serverActions = new Set(['role-seen', 'memory', 'report-submit', 'identity-guess', 'guard', 'seal', 'suggest', 'free-suggest', 'offer-testimony', 'ready', 'secret-pass', 'answer', 'question', 'search', 'audit', 'investigate-pass', 'review-audit', 'round-confirm', 'accuse-submit']);
     const getGame = () => config.getGame?.(), getRoom = () => config.getRoom?.(), pending = () => !!config.isPending?.();
     const current = () => config.getModalKind?.() || '';
     const isMine = g => !!g?.self && g.turnOwnerId === g.self.id;
+    const modernFlow = g => g?.flowVersion === 2;
+    const canPrepare = g => g?.phase === 'secret' && (modernFlow(g) ? g.self?.canPrepare === true : isMine(g));
+    const catalog = kind => ({ person: D.SUSPECTS, place: D.PLACES, tool: D.TOOLS, time: D.TIMES })[kind] || [];
+    const publicView = g => Object.assign({}, g, { self: undefined, caseSecret: undefined, partnerIds: undefined });
+    function actionOptions(g) { try { return actions?.options(g); } catch (_) { return null; } }
+    function recordOptions(g) { return actionOptions(g)?.records || D.RECORDS.map(r => ({ ...r, acquired: (g.questionHistory || []).some(q => q.recordId === r.id && q.status !== 'blocked') || (g.facts || []).some(f => f.recordId === r.id), available: !(g.questionHistory || []).some(q => q.recordId === r.id && q.status !== 'blocked') && !(g.facts || []).some(f => f.recordId === r.id) })); }
+    function abilityOptions(g) { return actionOptions(publicView(g))?.abilities || D.CATEGORIES.filter(c => !Number.isInteger(known(publicView(g), c.id))).map(c => ({ ...c, available: true })); }
     const role = id => D.ROLES[id]?.label || ({ detective: '탐정', witness: '목격자', culprit: '범인', accomplice: '공범', suspect: '용의자' }[id] || '참가자');
     const category = id => D.CATEGORIES.find(c => c.id === id), person = id => D.SUSPECTS.find(p => p.id === id), location = id => D.PLACES.find(p => p.id === id);
     const personName = id => person(id)?.name || '미기록 인물', placeName = id => location(id)?.name || '미기록 장소';
@@ -57,6 +65,8 @@
       return (g.statements || []).find(s => s.category === id && s.audited && s.isTrue)?.value;
     }
     function questionChoices(g) {
+      const shared = actionOptions(g)?.questions;
+      if (shared) return shared;
       return D.CATEGORIES.map(c => {
         if (Number.isInteger(known(g, c.id))) return null;
         let values = c.values.map((_, i) => i);
@@ -110,20 +120,64 @@
       return c.label + ' · ' + (values.length ? values.map(v => c.values[v] ?? '미기록').join(' 또는 ') : '아직 미확인');
     }
     function directions(g) {
-      if (g.players.length <= 2) return '';
+      if (g.players.length <= 2 && !modernFlow(g)) return '';
       const entries = (g.suggestions || []).filter(s => category(s.category));
-      return '<section class="seven-directions"><h3>수사 방향 제안 <small>참가자가 공개한 제안 · 확정 증거 아님</small></h3>' + (entries.length ? entries.map(s => '<article class="record-card"><small>' + day({ round: s.round }) + ' · ' + esc(memberName(g, s.speakerId)) + '</small><p>' + esc(category(s.category).label) + ' 수사 제안</p>' + (s.text ? '<p>' + esc(s.text) + '</p>' : '') + '</article>').join('') : '<p class="case-caption">아직 공개된 수사 방향 제안이 없습니다.</p>') + '</section>';
+      return '<section class="seven-directions"><h3>증언 신청 · 수사 방향 제안 <small>미검증 제안 · 확정 증거 아님</small></h3>' + (entries.length ? entries.slice(-12).map(s => {
+        const testimony = s.kind === 'testimony', legal = questionChoices(g).some(c => c.id === s.category && c.proposedValues.includes(s.value));
+        return '<article class="record-card"><small>' + day({ round: s.round }) + ' · ' + esc(memberName(g, s.speakerId)) + '</small><p>' + esc(testimony ? '증언 신청 · ' + catText(s.category, s.value) : category(s.category).label + ' 수사 제안') + '</p>' + (s.text ? '<p>' + esc(s.text) + '</p>' : '') + (testimony && g.self?.role === 'detective' && g.phase === 'investigate' ? button('adopt-testimony', legal ? '질문 초안으로 가져오기' : '이미 확인한 항목', ' data-id="' + esc(s.id) + '"', !legal) : '') + '</article>';
+      }).join('') : '<p class="case-caption">아직 공개된 증언 신청과 수사 제안이 없습니다.</p>') + '</section>';
+    }
+    function miniNotebook(g) {
+      const opts = actionOptions(g), possible = candidates(g);
+      return '<nav class="seven-action-notebook" aria-label="행동 중 사건기록 확인"><span>사건기록</span>' + [['person','인물','suspectId'],['place','장소','placeId'],['tool','도구','toolId'],['time','시간','timeId']].map(([id,label,key]) => {
+        const count = opts?.remaining?.[id]?.length ?? new Set(possible.map(c => c[key]).filter(Boolean)).size;
+        return button('action-notebook', label + '<b>' + count + '/' + catalog(id).length + '</b>', ' data-id="' + id + '" aria-pressed="' + (actionNotebook?.kind === id) + '"');
+      }).join('') + '</nav>';
+    }
+    function actionNotebookView(g) {
+      if (!actionNotebook) return '';
+      if (actionNotebook.recordId) {
+        const r = D.RECORDS.find(r => r.id === actionNotebook.recordId), facts = (g.facts || []).filter(f => f.recordId === actionNotebook.recordId);
+        return '<section class="seven-inline-source">' + button('action-back', '← 작성 중이던 행동으로') + '<h3>' + esc(r?.label || '확보한 원본') + '</h3><p>' + esc(r ? sourceDescription(r) : '') + '</p>' + facts.map(f => '<article class="record-card"><small>확보 완료 · DAY-' + String(f.round || 1).padStart(2,'0') + '</small><p>' + esc(recordText(f)) + '</p></article>').join('') + '</section>';
+      }
+      const kind = actionNotebook.kind;
+      if (actionNotebook.detailId) {
+        detailSelection = { kind, id: actionNotebook.detailId };
+        return '<section class="seven-inline-detail">' + button('action-back', '← 12개 기록으로') + detail(g) + '</section>';
+      }
+      return '<section class="seven-action-catalog">' + button('action-back', '← 작성 중이던 행동으로') + '<p class="case-caption">공식 제외 · 내 단서로 제외 · 나의 추정 X를 구분합니다. 사진을 눌러 근거를 확인하세요.</p><div class="seven-action-card-grid">' + catalog(kind).map(item => {
+        const status = referenceStatus(g,kind,item.id,true), excluded = status.excluded, memo = marked[kind].has(item.id);
+        return '<button class="seven-action-reference' + (excluded ? ' is-constrained' : '') + (excluded && !status.official ? ' is-private-constrained' : '') + (memo ? ' is-marked' : '') + '" data-action="seven-action-detail" data-kind="' + kind + '" data-id="' + esc(item.id) + '">' + art(kind,item.id,item.name) + (excluded || memo ? pencilX() : '') + (memo ? '<em class="seven-personal-mark">나의 추정 제외</em>' : '') + '<strong>' + esc(item.name) + '</strong><small>' + (excluded ? status.official ? '공식 기록상 제외' : '내 단서로 제외' : memo ? '나의 추정 제외' : '남은 후보') + '</small></button>';
+      }).join('') + '</div></section>';
+    }
+    function previousQuestion(g, targetId, categoryId) {
+      const entries = (g.questionHistory || []).filter(q => !q.recordId && q.targetId === targetId && q.category === categoryId);
+      const latest = entries[entries.length - 1], latestStatement = latest && (g.statements || []).find(s => latest.statementId && s.id === latest.statementId || s.round === latest.round && s.speakerId === latest.targetId && s.category === latest.category);
+      const latestStatus = latestStatement?.audited ? latestStatement.isTrue ? '검증된 참' : '검증된 거짓' : latest ? ({ answered:'답변 있음 · 미검증', blocked:'봉쇄 · 재시도 가능', unknown:'미진술 · 재질문 가능' })[latest.status] || '기록 있음' : '이전 질문 없음';
+      return '<details class="seven-question-history" aria-live="polite"><summary>이 대상 · 항목의 이전 질문 <span>' + entries.length + '건 · ' + esc(latestStatus) + '</span></summary>' + (entries.length ? entries.map(q => {
+        const statement = (g.statements || []).find(s => s.id === q.statementId || s.round === q.round && s.speakerId === q.targetId && s.category === q.category);
+        const status = statement?.audited ? statement.isTrue ? '검증된 참' : '검증된 거짓' : ({ answered:'답변 있음 · 미검증', blocked:'봉쇄 · 다음 날 재시도 가능', unknown:'미진술 · 다시 질문 가능', pending:'답변 대기' })[q.status] || '기록 있음';
+        return '<p' + (statement?.audited && statement.isTrue === false ? ' class="seven-verified-lie"' : '') + '>DAY-' + String(q.round || 1).padStart(2,'0') + ' · ' + esc(Number.isInteger(q.proposedValue) ? catText(q.category,q.proposedValue) : category(q.category)?.label) + ' <b>' + esc(status) + '</b>' + (Number.isInteger(statement?.value) ? '<span>답변: ' + esc(category(q.category).values[statement.value]) + '</span>' : '') + '</p>';
+      }).join('') : '<p>이 대상에게 이 항목을 물은 기록이 없습니다.</p>') + '</details>';
     }
     function records(g) {
       return '<section class="seven-records">' + directions(g) + '<h3>공식 증거 <small>공개 원본·검증</small></h3>' + ((g.facts || []).length ? g.facts.map(f => '<article class="record-card"><small>' + day({ round: f.round || 1 }) + ' · ' + esc(({ record: '부분 원본 기록', search: '부분 원본 기록', audit: '진술 검증', share: '관찰 공개' }[f.source] || '공식 기록')) + (f.recordId ? ' / ' + esc(D.RECORDS.find(r => r.id === f.recordId)?.label || '원본') : '') + '</small><p>' + esc(recordText(f)) + '</p></article>').join('') : '<p class="empty">아직 공개된 공식 증거가 없습니다.</p>') + '<h3>공식 진술 <small>검증 전에는 참 또는 거짓</small></h3>' + ((g.statements || []).length ? g.statements.map(s => '<article class="record-card claim' + (s.audited && s.isTrue === false ? ' seven-verified-lie' : '') + '"><small>' + day({ round: s.round || 1 }) + ' · ' + esc(memberName(g, s.speakerId)) + '</small><p>' + esc(catText(s.category, s.value)) + '</p><b>' + (s.audited ? s.isTrue ? '검증된 참 진술' : '검증된 거짓 진술' : '미검증 진술') + '</b></article>').join('') : '<p class="empty">아직 공식 진술이 없습니다.</p>') + '</section>';
     }
     function roster(g) {
-      return '<div class="seven-roster" aria-label="닉네임 참가자 프로필">' + g.players.map((p, i) => '<article class="seven-profile"><span class="seven-anonymous" aria-hidden="true">' + String(i + 1).padStart(2, '0') + '</span><div><strong>' + esc(p.name) + '</strong><small>' + (p.isDetective || p.id === g.detectiveId ? '공개 역할 · 탐정' : '비공개 역할') + '</small></div>' + (p.id === g.turnOwnerId ? '<span class="tag">현재 차례</span>' : '') + '</article>').join('') + '</div>';
+      return '<div class="seven-roster" aria-label="닉네임 참가자 프로필">' + g.players.map((p, i) => '<article class="seven-profile"><span class="seven-anonymous" aria-hidden="true">' + String(i + 1).padStart(2, '0') + '</span><div><strong>' + esc(p.name) + '</strong><small>' + (p.isDetective || p.id === g.detectiveId ? '공개 역할 · 탐정' : '비공개 역할') + '</small></div>' + (modernFlow(g) && g.phase === 'secret' ? (g.preparationReadyIds || []).includes(p.id) ? '<span class="tag">준비 완료</span>' : '' : p.id === g.turnOwnerId ? '<span class="tag">현재 차례</span>' : '') + '</article>').join('') + '</div>';
     }
     function pencilX() { return '<svg class="seven-pencil-x" viewBox="0 0 100 100" aria-hidden="true"><path d="M14 12 87 88M12 17 84 89M85 12 12 87M88 15 17 89"/></svg>'; }
     function constrained(g, kind, id) {
       const key = ({ person: 'suspectId', place: 'placeId', tool: 'toolId', time: 'timeId' })[kind], possible = candidates(Object.assign({}, g, { self: undefined }));
       return possible.length > 0 && !possible.some(c => c[key] === id);
+    }
+    function referenceStatus(g,kind,id,includePrivate) {
+      const official = constrained(g,kind,id);
+      if (!includePrivate || official) return { excluded:official,official };
+      const remaining = actionOptions(g)?.remaining?.[kind];
+      if (remaining) return { excluded:!remaining.includes(id),official:false };
+      const key = ({ person:'suspectId',place:'placeId',tool:'toolId',time:'timeId' })[kind], possible = candidates(g);
+      return { excluded:possible.length > 0 && !possible.some(c => c[key] === id),official:false };
     }
     function board(g, kind, items, title) {
       const possible = candidates(Object.assign({}, g, { self: undefined })), key = ({ person: 'suspectId', place: 'placeId', tool: 'toolId', time: 'timeId' })[kind], ids = new Set(possible.map(c => c[key]).filter(Boolean));
@@ -133,16 +187,26 @@
       const catalog = { person: D.SUSPECTS, place: D.PLACES, tool: D.TOOLS, time: D.TIMES }, titles = { person: '사건 인물', place: '사건 장소', tool: '도구의 흔적', time: '사건 시간대' };
       return '<section class="seven-notebook"><header class="seven-notebook-heading"><small>CASE RECORDS / PUBLIC NOTEBOOK</small><h2>사건기록 수첩</h2><p>사진을 누르면 특징과 연결 자료를 자세히 확인합니다.</p></header><nav class="seven-notebook-tabs" aria-label="사건기록 분류">' + [['person','인물'],['place','장소'],['tool','도구'],['time','시간']].map(([id,label]) => '<button data-action="seven-board-tab" data-id="' + id + '" aria-pressed="' + (boardTab === id) + '">' + label + '<small>' + catalog[id].length + '</small></button>').join('') + '</nav><div class="seven-notebook-body">' + board(g, boardTab, catalog[boardTab], titles[boardTab]) + (boardTab === 'time' ? '<p class="notice seven-time-context">사건 당일 18:00–21:00의 15분 구간입니다. DAY-01–07은 사건 이후의 수사일이며, 이 시간 카드와 별개입니다.</p>' : '') + '<p class="manual-note-legend">회색 사진과 붉은 연필 X는 제외 표시입니다. 상세 자료에서 공식 제외와 나의 추정 메모를 구분해 확인하세요.</p></div></section>';
     }
-    function detail(g) {
+    function fullDetail(g) {
       if (!detailSelection) return '';
       const { kind, id } = detailSelection, item = (kind === 'person' ? D.SUSPECTS : kind === 'place' ? D.PLACES : kind === 'tool' ? D.TOOLS : D.TIMES).find(p => p.id === id);
       if (!item) return '';
-      const excluded = constrained(g, kind, id), memo = marked[kind].has(id);
-      return '<article class="seven-detail"><div class="seven-detail-art' + (excluded || memo ? ' is-excluded' : '') + '">' + art(kind, id, item.name + ' 상세 공개 자료') + (excluded || memo ? pencilX() : '') + '</div><div class="seven-detail-info"><small>PUBLIC REFERENCE / 공개 사건 자료</small><h3>' + esc(item.name) + '</h3>' + (item.job ? '<p>' + esc(item.job) + '</p>' : '') + '<div class="seven-traits">' + (kind === 'person' ? traits(item, 'person') : kind === 'place' ? traits(item, 'place') : esc(item.description || item.detail || (kind === 'tool' ? '취급 가능 범위와 복수 가능성 부분 기록을 대조하는 도구입니다. 실제 사용이 확인되었다는 뜻은 아닙니다.' : '근무 가능 범위와 복수 가능성 부분 기록을 대조하는 시간 구간입니다. 실제 현장 체류가 확인되었다는 뜻은 아닙니다.'))) + '</div>' + links(g, kind, id) + (kind === 'time' ? '<p class="notice">이 카드는 사건 당일 18:00–21:00 안의 15분 구간입니다. 수사일 DAY-01–07을 뜻하지 않습니다. 정확한 시간은 카드의 문자 표기를 기준으로 대조하세요.</p>' : '') + '<p class="notice">' + (excluded ? '확인한 기록과 불일치하여 현재 사건 후보에서 제외됩니다. 최종 고발에서는 나의 참 관찰까지 함께 반영해 남은 후보를 표시합니다.' : '확인한 공개 기록만으로는 아직 제외되지 않은 항목입니다.') + '</p><p class="case-caption">나의 제외 메모는 개인적인 추정이며 공식 증거와 구분됩니다. 메모를 바꿔도 공식 기록과 최종 후보 계산은 바뀌지 않습니다.</p>' + button('mark', memo ? '내 제외 메모 해제' : '내 제외 메모 표시', ' data-kind="' + kind + '" data-id="' + esc(id) + '"') + '</div></article>';
+      const status = referenceStatus(g,kind,id,!!actionNotebook?.detailId && !!config.privateVisible?.()), excluded = status.excluded, memo = marked[kind].has(id);
+      return '<article class="seven-detail"><div class="seven-detail-art' + (excluded || memo ? ' is-excluded' : '') + '">' + art(kind, id, item.name + ' 상세 공개 자료') + (excluded || memo ? pencilX() : '') + '</div><div class="seven-detail-info"><small>PUBLIC REFERENCE / 공개 사건 자료</small><h3>' + esc(item.name) + '</h3>' + (item.job ? '<p>' + esc(item.job) + '</p>' : '') + '<div class="seven-traits">' + (kind === 'person' ? traits(item, 'person') : kind === 'place' ? traits(item, 'place') : esc(item.description || item.detail || (kind === 'tool' ? '취급 가능 범위와 복수 가능성 부분 기록을 대조하는 도구입니다. 실제 사용이 확인되었다는 뜻은 아닙니다.' : '근무 가능 범위와 복수 가능성 부분 기록을 대조하는 시간 구간입니다. 실제 현장 체류가 확인되었다는 뜻은 아닙니다.'))) + '</div>' + links(g, kind, id) + (kind === 'time' ? '<p class="notice">이 카드는 사건 당일 18:00–21:00 안의 15분 구간입니다. 수사일 DAY-01–07을 뜻하지 않습니다. 정확한 시간은 카드의 문자 표기를 기준으로 대조하세요.</p>' : '') + '<p class="notice">' + (excluded ? status.official ? '공개 기록과 불일치하여 공식 후보에서 제외됩니다.' : '내가 확인한 관찰·정체와 공개 연결 자료를 대조하면 제외됩니다. 이 제외 근거는 나의 비밀 수첩에서만 확인합니다.' : '이 화면에서 확인한 기록으로는 아직 제외되지 않은 항목입니다.') + '</p><p class="case-caption">나의 제외 메모는 개인적인 추정이며 공식 증거와 구분됩니다. 메모를 바꿔도 공식 기록과 최종 후보 계산은 바뀌지 않습니다.</p>' + button('mark', memo ? '내 제외 메모 해제' : '내 제외 메모 표시', ' data-kind="' + kind + '" data-id="' + esc(id) + '"') + '</div></article>';
+    }
+    function detail(g) {
+      const content = fullDetail(g);
+      const privateReference = !!actionNotebook?.detailId && !!config.privateVisible?.();
+      if (!detailSelection || !referenceStatus(g,detailSelection.kind,detailSelection.id,privateReference).excluded) return content;
+      const reasons = actions?.exclusionReasons?.(privateReference ? g : publicView(g),detailSelection.kind,detailSelection.id);
+      if (Array.isArray(reasons) && reasons.length) return content + '<section class="seven-exclusion-basis"><h4>이 항목이 제외된 근거</h4><p>' + (privateReference ? '나에게 허용된 관찰·정체 정보와 공개 연결 자료를 함께 대조합니다. 비밀 관찰은 이 창에만 표시합니다.' : '공개 연결 자료와 아래 기록을 함께 대조한 결과입니다.') + ' 나의 추정 X는 후보 계산을 바꾸지 않습니다.</p>' + reasons.map(reason => '<article><small>' + esc(reason.label || '대조 기록') + '</small><p>' + esc(reason.text || '') + '</p></article>').join('') + '</section>';
+      const entries = (g.facts || []).map(f => '<li>' + esc(recordText(f)) + '</li>');
+      const verified = (g.statements || []).filter(s => s.audited).map(s => '<li>' + esc(catText(s.category,s.value)) + ' · ' + (s.isTrue ? '검증된 참' : '검증된 거짓') + '</li>');
+      return content + '<details class="seven-exclusion-basis"><summary>공식 제외의 대조 근거 확인</summary><p>아래 공개 원본·검증, 공개 진술의 거짓 예산과 인물별 연결 조합을 함께 대조했을 때 이 항목이 남지 않습니다. 나의 추정 X와 다른 사람의 비밀 관찰은 이 계산에 사용하지 않습니다.</p><ul>' + entries.concat(verified).join('') + '</ul><p>미검증 진술 하나만으로 참·거짓을 인증하지는 않습니다. 함께 남긴 기록에서 질문과 답변 이력을 확인할 수 있습니다.</p></details>';
     }
     function render(g, room) {
       if (!g) return '';
-      return '<div class="seven-game"><header class="online-section-title"><div><div class="eyebrow">' + (room?.code ? 'ROOM ' + esc(room.code) + ' / ' : '') + day(g) + ' / SEVEN DAYS</div><h1>7일의 기록, 마지막 목격자.</h1><p class="case-caption">역할과 사건 인물은 따로 배정됩니다. 공개 프로필에는 닉네임만 남습니다.</p></div><span class="seven-day-badge">' + g.round + '<small> / 7 DAYS</small></span></header>' + roster(g) + '<section class="seven-turn"><div><small>' + day(g) + ' · ' + esc(PHASES[g.phase] || g.phase) + '</small><h2>' + (isMine(g) ? '지금, 나의 차례입니다.' : esc(memberName(g, g.turnOwnerId)) + '님의 차례') + '</h2><p>' + (g.phase === 'final' ? '7일 수사와 검토가 끝났습니다. 탐정이 사건 인물 한 명을 최종 고발합니다.' : '개인행동 → 탐정의 공식 수사 1회 → 답변·검토 → 하루 확인') + '</p></div>' + button('personal', '나의 수첩 · 행동 열기') + button('ledger', '공식 수사기록') + '</section><div class="seven-resource-strip"><span>공식 수사 <b>하루 1회</b></span><span>진술 검증 <b>' + g.kits + ' / 1</b></span><span>공유 거짓 예산 <b>전체 2회</b></span><span>최종 고발 <b>사건 인물 1명</b></span></div><div class="seven-layout"><div>' + notebook(g) + '<p class="manual-note-legend">제외 표시는 이 기기의 추정 메모입니다. 역할 주장과 정체 추정은 공식 인증이나 면죄부가 되지 않습니다.</p></div><aside class="side-panel seven-side"><div class="eyebrow">SHARED PUBLIC RECORD</div><h2>함께 남긴 기록</h2><p>원본 수사는 기록의 일부를 보여 줍니다. 공식 답변은 검증하기 전까지 참과 거짓 모두 가능하며, 봉쇄·유보된 질문은 다시 물을 수 있습니다.</p>' + records(g) + button('ledger', '기록과 질문 이력 모두 보기') + button('clear-marks', '나의 제외 메모 초기화') + '</aside></div></div>';
+      return '<div class="seven-game"><header class="online-section-title"><div><div class="eyebrow">' + (room?.code ? 'ROOM ' + esc(room.code) + ' / ' : '') + day(g) + ' / SEVEN DAYS</div><h1>7일의 기록, 마지막 목격자.</h1><p class="case-caption">역할과 사건 인물은 따로 배정됩니다. 공개 프로필에는 닉네임만 남습니다.</p></div><span class="seven-day-badge">' + g.round + '<small> / 7 DAYS</small></span></header>' + roster(g) + '<section class="seven-turn"><div><small>' + day(g) + ' · ' + esc(modernFlow(g) && g.phase === 'secret' ? '동시 비밀 준비' : PHASES[g.phase] || g.phase) + '</small><h2>' + (modernFlow(g) && g.phase === 'secret' ? canPrepare(g) ? '오늘의 준비를 함께 시작합니다.' : '모두의 준비를 기다립니다.' : isMine(g) ? '지금, 나의 차례입니다.' : esc(memberName(g, g.turnOwnerId)) + '님의 차례') + '</h2><p>' + (g.phase === 'final' ? '7일 수사와 검토가 끝났습니다. 탐정이 사건 인물 한 명을 최종 고발합니다.' : modernFlow(g) ? '동시 비밀 준비 → 탐정 수사 1회 → 답변·검토 → 다음 DAY' : '개인행동 → 탐정의 공식 수사 1회 → 답변·검토 → 하루 확인') + '</p></div>' + button('personal', '나의 수첩 · 행동 열기') + button('ledger', '공식 수사기록') + '</section><div class="seven-resource-strip"><span>공식 수사 <b>하루 1회</b></span><span>진술 검증 <b>' + g.kits + ' / 1</b></span><span>공유 거짓 예산 <b>전체 2회</b></span><span>최종 고발 <b>사건 인물 1명</b></span></div><div class="seven-layout"><div>' + notebook(g) + '<p class="manual-note-legend">제외 표시는 이 기기의 추정 메모입니다. 역할 주장과 정체 추정은 공식 인증이나 면죄부가 되지 않습니다.</p></div><aside class="side-panel seven-side"><div class="eyebrow">SHARED PUBLIC RECORD</div><h2>함께 남긴 기록</h2><p>원본 수사는 기록의 일부를 보여 줍니다. 공식 답변은 검증하기 전까지 참과 거짓 모두 가능하며, 봉쇄·유보된 질문은 다시 물을 수 있습니다.</p>' + records(g) + button('ledger', '기록과 질문 이력 모두 보기') + button('clear-marks', '나의 제외 메모 초기화') + '</aside></div></div>';
     }
     function identity(g) {
       const self = g.self, id = self.identity || {}, knownId = id.known && person(id.characterId) ? id.characterId : null;
@@ -154,13 +218,27 @@
     }
     function identityHistory(g) {
       if (g.self.role !== 'suspect') return '';
-      const self = g.self, passed = g.round > 6 || g.round === 6 && (g.phase !== 'secret' || Number.isInteger(g.turnIndex) && g.turnIndex > g.players.findIndex(p => p.id === self.id));
+      const self = g.self, passed = g.round > 6 || g.round === 6 && (g.phase !== 'secret' || (modernFlow(g) ? !!self.preparationReady : Number.isInteger(g.turnIndex) && g.turnIndex > g.players.findIndex(p => p.id === self.id)));
       return '<section class="seven-identity-history"><h3>나의 비공개 추적 기록</h3>' + ((self.identity?.memory || []).map(m => '<p class="seven-clue">DAY-' + String(m.round).padStart(2, '0') + ' 기억 복원 · 남은 후보 ' + esc(m.candidates.map(personName).join(', ')) + '</p>').join('') || '<p class="case-caption">아직 기억 복원 기록이 없습니다.</p>') + (self.identityGuess ? '<p>나의 현재 정체 추정: <b>' + esc(personName(self.identityGuess.suspectId)) + '</b> · 개인 메모</p>' : '') + (self.sealedReport ? '<article class="seven-action-card"><h4>DAY-' + String(self.sealedReport.round).padStart(2, '0') + ' 봉인 제보 완료</h4><p>' + esc(personName(self.sealedReport.suspectId)) + ' · ' + esc(self.sealedReport.text) + '</p><small>접수된 내용만 확인할 수 있습니다. 수정·철회·정답 응답은 없습니다.</small></article>' : '<p class="notice">' + (passed ? '봉인 제보 마감 · 이번 사건에는 제보를 남기지 않았습니다.' : '봉인 제보 마감은 DAY-06 나의 개인행동 종료입니다. 접수 기회가 ' + (g.round === 6 ? '오늘 한 번' : '남아') + ' 있습니다.') + '</p>') + '</section>';
     }
-    function reportAvailable(g) { return g.self?.role === 'suspect' && g.phase === 'secret' && isMine(g) && g.round <= 6 && !g.self.sealedReport; }
+    function reportAvailable(g) { return g.self?.role === 'suspect' && canPrepare(g) && g.round <= 6 && !g.self.sealedReport; }
+    function freeParticipation(g) {
+      if (!modernFlow(g) || !g.self || ['reveal','finished'].includes(g.phase)) return '';
+      const self = g.self;
+      let html = '<section class="seven-free-participation"><h3>차례를 기다리지 않는 참여</h3><p class="case-caption">제안·증언 신청·정체 메모는 오늘의 비밀 행동을 소비하지 않습니다. 공식 답변과 검증을 거치기 전에는 확정 증거가 아닙니다.</p>';
+      if (self.role !== 'detective') {
+        const c = category(drafts['seven-testimony-category']) || D.CATEGORIES[0], values = c.values.map((name,id) => ({ id,name }));
+        if (!c.values[Number(drafts['seven-testimony-value'])]) drafts['seven-testimony-value'] = '0';
+        html += '<div class="seven-action-card"><h4>증언 신청</h4>' + field('seven-testimony-category','말하고 싶은 관찰 항목',D.CATEGORIES,c.id) + field('seven-testimony-value','내가 제안하는 진술',values) + '<label class="field"><span>증언 설명 · 선택</span><textarea id="seven-testimony-text" data-draft="seven-testimony-text" maxlength="300" placeholder="기억한 근거나 반론을 적으세요.">' + esc(drafts['seven-testimony-text'] || '') + '</textarea></label>' + button('offer-testimony','탐정에게 증언을 신청한다') + '</div><details class="seven-free-suggestion"><summary>수사 방향을 제안하기</summary>' + field('seven-free-category','다음에 확인할 항목',D.CATEGORIES) + '<label class="field"><span>제안 이유 · 선택</span><textarea id="seven-free-text" data-draft="seven-free-text" maxlength="300">' + esc(drafts['seven-free-text'] || '') + '</textarea></label>' + button('free-suggest','수사 방향 공개 제안') + '</details>';
+      }
+      if (self.role === 'suspect') html += '<div class="seven-action-card"><h4>나의 정체 추정 메모 · 언제든 수정</h4><p>행동과 횟수를 쓰지 않는 개인 메모입니다. 정체 확인·결백 인증이 아닙니다.</p>' + field('seven-identity-guess','추정하는 나의 인물',D.SUSPECTS,self.identityGuess?.suspectId) + '<label class="field"><span>추정 근거 · 선택</span><textarea id="seven-identity-text" data-draft="seven-identity-text" maxlength="300">' + esc(drafts['seven-identity-text'] || self.identityGuess?.text || '') + '</textarea></label>' + button('identity-guess','나의 추정 메모 저장') + '</div>';
+      if (self.role === 'detective') html += directions(g);
+      return html + '</section>';
+    }
     function secretControls(g) {
-      if (!isMine(g) || g.phase !== 'secret') return '<p class="notice">나의 개인행동 차례에 선택할 수 있습니다. 자유 발언은 모든 단계에서 가능합니다.</p>';
-      const self = g.self, select = field('seven-secret-category', '기록 항목', D.CATEGORIES);
+      if (modernFlow(g)) return preparationControls(g);
+      if (!canPrepare(g)) return '<p class="notice">나의 개인행동 차례에 선택할 수 있습니다. 자유 발언은 모든 단계에서 가능합니다.</p>';
+      const self = g.self, abilities = abilityOptions(g).filter(c => c.available !== false), select = abilities.length ? field('seven-secret-category', '아직 효과가 남은 공개 기록 항목', abilities) : '<p class="notice">공개 기록상 효과를 낼 항목이 없습니다. 능력을 아끼고 차례를 마칠 수 있습니다.</p>';
       let html = '<section class="seven-actions"><h3>오늘의 개인행동 <small>한 가지 선택</small></h3>';
       if (self.role === 'suspect') {
         html += '<div class="seven-action-card"><h4>나의 기억 복원</h4><p>누구도 봉쇄할 수 없는 개인 기억입니다. 3명 → 2명 → 1명, 두 번의 행동으로 나의 정체를 확인합니다.</p>' + button('memory', '기억을 복원한다 · 남은 ' + (self.identity?.memoryLeft ?? 0) + '회', '', !(self.identity?.memoryLeft > 0)) + '</div>';
@@ -169,10 +247,26 @@
         else if (g.round > 6) html += '<p class="notice">봉인 제보가 마감되었습니다.</p>';
         else html += field('seven-report-person', '제보할 사건 인물', D.SUSPECTS) + '<label class="field"><span>제보 이유</span><textarea id="seven-report-reason" data-draft="seven-report-reason" maxlength="300" placeholder="당신이 추적한 근거를 남겨 주세요.">' + esc(drafts['seven-report-reason'] || '') + '</textarea></label>' + button('report-submit', '이 인물과 이유를 한 번만 봉인 제출', ' data-mutate');
         html += '</div><div class="seven-action-card"><h4>나의 정체 추정 메모</h4><p>나의 개인행동 차례마다 새 추정으로 수정할 수 있습니다. 오늘의 행동을 1회 사용하며, 본인 캐릭터 확인이나 결백 인증이 되지 않습니다.</p>' + field('seven-identity-guess', '추정하는 나의 인물', D.SUSPECTS, self.identityGuess?.suspectId) + button('identity-guess', '오늘의 행동으로 정체 추정 기록') + '</div>';
-        html += '<div class="seven-action-card"><h4>기록 보호 · 남은 ' + (self.guardLeft ?? 0) + '회</h4>' + select + button('guard', '오늘 이 항목을 봉쇄에서 보호', '', !self.guardLeft) + '</div>';
-      } else if (['culprit', 'accomplice'].includes(self.role)) html += '<div class="seven-action-card"><h4>기록 봉쇄 · 남은 ' + (self.sabotageLeft ?? 0) + '회</h4><p>오늘의 해당 항목 질문·수사를 막을 수 있습니다. 이미 공개된 공식 증거는 변하지 않습니다.</p>' + select + button('seal', '이 항목의 기록을 봉쇄', '', !self.sabotageLeft) + '</div>';
+        html += '<div class="seven-action-card"><h4>기록 보호 · 남은 ' + (self.guardLeft ?? 0) + '회</h4>' + select + button('guard', '오늘 이 항목을 봉쇄에서 보호', '', !self.guardLeft || !abilities.length) + '</div>';
+      } else if (['culprit', 'accomplice'].includes(self.role)) html += '<div class="seven-action-card"><h4>기록 봉쇄 · 남은 ' + (self.sabotageLeft ?? 0) + '회</h4><p>오늘의 해당 항목 질문·수사를 막을 수 있습니다. 이미 공개된 공식 증거는 변하지 않습니다.</p>' + select + button('seal', '이 항목의 기록을 봉쇄', '', !self.sabotageLeft || !abilities.length) + '</div>';
       else if (g.players.length > 2) html += '<div class="seven-action-card"><h4>수사 방향 제안</h4><p>알아보고 싶은 기록 항목을 공개 수첩에 제안합니다. 원본 증거로 확정되지는 않습니다.</p>' + select + button('suggest', '이 항목의 수사를 제안') + '</div>';
       return html + button('secret-pass', '개인행동을 넘기고 다음 차례로') + '</section>';
+    }
+    function preparationControls(g) {
+      if (g.phase !== 'secret') return '';
+      const self = g.self, completed = g.preparationReadyIds?.length || 0, total = g.players.length;
+      if (!canPrepare(g)) return '<section class="seven-preparation"><h3>' + (self.preparationReady ? '오늘의 비밀 준비를 마쳤습니다.' : '모두의 비밀 준비를 기다립니다.') + '</h3><p>준비 완료 ' + completed + ' / ' + total + '명 · 증언 신청과 수사 제안은 계속할 수 있습니다.</p><p class="case-caption">선택한 능력과 사용 여부는 공개하지 않습니다. 준비가 모이면 탐정의 공식 수사가 시작됩니다.</p></section>';
+      const choices = self.role === 'suspect' ? [['memory','기억 복원'],['report','봉인 제보'],['guard','기록 보호']] : ['culprit','accomplice'].includes(self.role) ? [['seal','기록 봉쇄']] : [];
+      if (!choices.some(([id]) => id === secretPane)) secretPane = choices[0]?.[0] || 'ready';
+      let html = '<section class="seven-preparation"><h3>오늘의 비밀 준비 <small>동시에 선택 · 준비 ' + completed + '/' + total + '</small></h3><p class="case-caption">강한 능력 한 가지를 사용하거나 기회를 아끼고 준비를 마칩니다. 증언·제안은 별도 메뉴에서 언제든 가능합니다.</p>';
+      if (choices.length) html += '<nav class="seven-preparation-tabs">' + choices.map(([id,label]) => button('secret-pane',label,' data-id="' + id + '" aria-pressed="' + (secretPane === id) + '"')).join('') + '</nav>';
+      if (secretPane === 'memory') html += '<article class="seven-action-card"><h4>나의 기억 복원 · 남은 ' + (self.identity?.memoryLeft || 0) + '회</h4><p>봉쇄되지 않는 개인 기억입니다. 두 번의 행동으로 정체 후보 3명 → 2명 → 1명을 확인합니다.</p>' + button('memory','기억을 복원하고 준비 완료','',!(self.identity?.memoryLeft > 0)) + '</article>';
+      if (secretPane === 'report') html += '<article class="seven-action-card"><h4>진범 봉인 제보 · 단 한 번</h4><p>DAY-06 비밀 준비까지 제출할 수 있습니다. 수정·철회·정답 응답이 없으며 내가 고발되면 개인 패배가 우선합니다.</p>' + (self.sealedReport ? '<p class="notice">DAY-' + String(self.sealedReport.round).padStart(2,'0') + ' 제보 봉인 완료 · ' + esc(personName(self.sealedReport.suspectId)) + '</p>' : g.round > 6 ? '<p class="notice">봉인 제보가 마감되었습니다.</p>' : field('seven-report-person','제보할 사건 인물',D.SUSPECTS) + '<label class="field"><span>제보 이유</span><textarea id="seven-report-reason" data-draft="seven-report-reason" maxlength="300">' + esc(drafts['seven-report-reason'] || '') + '</textarea></label>' + button('report-submit','한 번만 봉인 제출하고 준비 완료',' data-mutate')) + '</article>';
+      if (['guard','seal'].includes(secretPane)) {
+        const protect = secretPane === 'guard', available = abilityOptions(g).filter(c => c.available !== false), count = protect ? self.guardLeft : self.sabotageLeft;
+        html += '<article class="seven-action-card"><h4>기록 ' + (protect ? '보호' : '봉쇄') + ' · 남은 ' + (count || 0) + '회</h4><p>공개 기록상 아직 효과가 남은 항목만 표시합니다. 다른 사람의 비밀 관찰·비밀 행동은 표시하지 않습니다.</p>' + (available.length ? field('seven-secret-category','기록 항목',available) : '<p class="notice">효과를 낼 공개 기록 항목이 없습니다. 기회를 아끼고 준비를 마칠 수 있습니다.</p>') + button(secretPane, (protect ? '이 항목을 보호' : '이 항목의 봉쇄를 준비') + ' · 준비 완료','',!count || !available.length) + '</article>';
+      }
+      return html + button('ready',choices.length ? '능력을 아끼고 준비 완료' : self.role === 'detective' ? '수사 준비 완료' : '증언을 준비하고 준비 완료',' data-ready') + '</section>';
     }
     function answerControls(g) {
       const q = g.pending; if (!q || !isMine(g) || g.phase !== 'answer') return '';
@@ -183,7 +277,7 @@
     function investigation(g) {
       const detective = g.self.role === 'detective' && isMine(g) && g.phase === 'investigate';
       if (!detective) return '';
-      let html = '<section class="seven-actions"><h3>탐정의 공식 수사 <small>오늘 1회</small></h3>' + directions(g) + '<div class="seven-tabs">' + [['question', '공식 질문'], ['search', '원본 수사'], ['audit', '진술 검증']].map(([id, label]) => button('tab', label, ' data-id="' + id + '" aria-pressed="' + (selectedTab === id) + '"')).join('') + '</div>';
+      let html = '<section class="seven-actions"><h3>탐정의 공식 수사 <small>오늘 1회</small></h3>' + (modernFlow(g) ? '' : directions(g)) + '<div class="seven-tabs">' + [['question', '공식 질문'], ['search', '원본 수사'], ['audit', '진술 검증']].map(([id, label]) => button('tab', label, ' data-id="' + id + '" aria-pressed="' + (selectedTab === id) + '"')).join('') + '</div>';
       if (selectedTab === 'question') {
         const selection = questionSelection(g), c = selection.category;
         if (!c) {
@@ -193,18 +287,27 @@
           const targets = g.players.filter(p => p.id !== g.self.id);
           if (!targets.some(p => p.id === drafts['seven-question-target'])) drafts['seven-question-target'] = targets[0]?.id || '';
           drafts['seven-question-category'] = c.id; drafts['seven-question-proposed'] = String(selection.proposedValue);
-          html += '<p>나의 참 관찰과 확인된 기록으로 이미 아는 항목은 제외했습니다. 미검증 진술은 다른 가정으로 확인할 수 있고, 봉쇄·미진술된 질문도 다시 물을 수 있습니다.</p><div class="form-grid">' + field('seven-question-target', '공식 답변을 요청할 닉네임', targets) + field('seven-question-category', '질문할 관찰 항목', selection.categories, c.id) + field('seven-question-proposed', '확인하려는 진술', c.proposedValues.map(id => ({ id, name: c.values[id] })), selection.proposedValue) + '</div>' + button('question', '이 진술을 공식 질문한다');
+          html += '<details class="seven-action-help"><summary>질문 필터·재질문 안내</summary><p>나의 참 관찰과 확인된 기록으로 이미 아는 항목은 제외했습니다. 미검증 진술은 다른 가정으로 확인할 수 있고, 봉쇄·미진술된 질문도 다시 물을 수 있습니다.</p></details><div class="form-grid">' + field('seven-question-target', '공식 답변을 요청할 닉네임', targets) + field('seven-question-category', '질문할 관찰 항목', selection.categories, c.id) + field('seven-question-proposed', '확인하려는 진술', c.proposedValues.map(id => ({ id, name: c.values[id] })), selection.proposedValue) + '</div>' + previousQuestion(g,drafts['seven-question-target'],c.id) + '<p class="seven-action-check">확정 전에 최신 기록을 다시 확인합니다. 이미 해결된 항목에는 조사권을 사용하지 않습니다.</p>' + button('question', '이 진술을 공식 질문한다');
         }
-      } else if (selectedTab === 'search') html += '<p>원본 기록의 일부를 확보합니다. 기록 하나가 사건의 전체 정답을 알려 주지는 않습니다.</p><div class="seven-record-options">' + D.RECORDS.map(r => '<article class="seven-action-card"><h4>' + esc(r.label) + '</h4><p>' + esc(sourceDescription(r)) + '</p>' + button('search', '이 원본 기록 수사', ' data-id="' + esc(r.id) + '"') + '</article>').join('') + '</div>';
-      else html += '<p>공용 검증 도구 1개를 사용해 공식 진술의 참·거짓만 확인합니다. 정답값은 직접 공개되지 않습니다.</p>' + ((g.statements || []).filter(s => !s.audited).map(s => '<article class="seven-action-card"><p>' + esc(memberName(g, s.speakerId) + ' · ' + catText(s.category, s.value)) + '</p>' + button('audit', '이 공식 진술 검증', ' data-id="' + esc(s.id) + '"', !g.kits) + '</article>').join('') || '<p class="empty">검증할 미확인 진술이 없습니다.</p>');
+      } else if (selectedTab === 'search') html += '<p>원본 기록의 일부를 확보합니다. 확보한 기록은 다시 조사하지 않고 바로 읽을 수 있습니다.</p><div class="seven-record-options">' + recordOptions(g).map(r => '<article class="seven-action-card' + (r.acquired ? ' is-acquired' : '') + '"><h4>' + esc(r.label || D.RECORDS.find(source => source.id === r.id)?.label) + '</h4><p>' + esc(sourceDescription(D.RECORDS.find(source => source.id === r.id) || r)) + '</p>' + (r.acquired ? button('source-view','확보 완료 · 기록 보기',' data-id="' + esc(r.id) + '"') : button('search',r.available === false ? '현재 조사할 수 없는 원본' : '이 원본 기록 수사',' data-id="' + esc(r.id) + '"',r.available === false)) + (r.reason ? '<small>' + esc(r.reason) + '</small>' : '') + '</article>').join('') + '</div>';
+      else { const auditable = (g.statements || []).filter(s => !s.audited); html += '<details class="seven-action-help"><summary>진술 검증 안내 · 공용 도구 ' + g.kits + '개</summary><p>공용 검증 도구 1개를 사용해 공식 진술의 참·거짓만 확인합니다. 정답값은 직접 공개되지 않습니다.</p></details><div class="seven-audit-options">' + (auditable.length ? auditable.map(s => '<article class="seven-action-card"><p>' + esc(memberName(g, s.speakerId) + ' · ' + catText(s.category, s.value)) + '</p>' + button('audit', '이 공식 진술 검증', ' data-id="' + esc(s.id) + '"', !g.kits) + '</article>').join('') : '<p class="empty">검증할 미확인 진술이 없습니다.</p>') + '</div>'; }
       return html + button('investigate-pass', '오늘의 공식 수사를 넘긴다') + '</section>';
     }
-    function personal(g, visible) {
+    function fullPersonal(g, visible) {
       if (!g?.self || g.phase === 'finished') return '';
       if (!visible) return '<section class="seven-private-lock"><div class="seven-lock-art"></div><small>' + day(g) + ' / 나만 보는 수첩</small><h3>주변에 다른 화면이 보이지 않나요?</h3><p>내 역할, 정체 후보와 관찰 자료를 엽니다. 화면을 벗어나면 다시 가려집니다.</p>' + button('private-show', '내 비밀 수첩 확인') + '</section>';
       const self = g.self, criminal = ['culprit', 'accomplice'].includes(self.role);
       const roleCopy = { detective: '일곱 날의 수사와 검토 후 사건 인물 한 명을 고발합니다.', witness: '부분 기억을 바탕으로 관찰한 사실을 전합니다.', culprit: '나의 사건 인물이 실제 진범입니다. 탐정의 최종 고발을 피하세요.', accomplice: '범인과 사건의 진실을 공유합니다. 범인 진영과 함께 움직입니다.', suspect: '독립 역할입니다. 내 정체를 찾아가며 진범을 비밀 제보하세요. 탐정에게 실제 나의 인물이 고발되면 개인 패배가 우선합니다.' }[self.role] || '';
       return '<div class="seven-private"><header class="seven-private-head"><small>' + day(g) + ' / ' + esc(PHASES[g.phase]) + '</small><h2>' + esc(self.name) + ' · ' + esc(role(self.role)) + '</h2><p>' + esc(roleCopy) + '</p></header>' + identity(g) + identityHistory(g) + clues(g) + (criminal && g.caseSecret ? '<section class="seven-crime-brief"><h3>범인 진영에만 전달된 진상</h3><p>' + esc(personName(g.caseSecret.suspectId)) + ' / ' + esc(placeName(g.caseSecret.placeId)) + ' / ' + esc(D.TOOLS.find(t => t.id === g.caseSecret.toolId)?.name) + ' / ' + esc(D.TIMES.find(t => t.id === g.caseSecret.timeId)?.name) + '</p><p>함께하는 닉네임: ' + esc((g.partnerIds || []).map(id => memberName(g, id)).join(', ') || '없음') + '</p></section>' : '') + (self.role === 'suspect' ? '<p class="notice">나의 인물이 최종 고발되면 제보 결과와 무관하게 개인 패배입니다. 그 밖에는 정확 제보만 개인 승리, 오제보·미제보는 생존·목표 미달입니다. 범인과 용의자는 동시 승리할 수 있습니다.</p>' : '') + (g.phase === 'reveal' && isMine(g) ? button('role-seen', '내 역할과 목표를 확인했습니다') : '') + (g.phase === 'answer' ? answerControls(g) : '') + secretControls(g) + investigation(g) + (g.phase === 'discussion' && self.role === 'detective' ? button('review', '도착한 답변·기록 검토') : '') + (g.phase === 'final' && self.role === 'detective' ? accuse(g) : '') + '</div>';
+    }
+    function personal(g, visible) {
+      if (!g?.self || g.phase === 'finished' || !visible) return fullPersonal(g,visible);
+      if (actionNotebook) return '<div class="seven-action-workspace">' + miniNotebook(g) + actionNotebookView(g) + '</div>';
+      if (!modernFlow(g) || g.phase === 'reveal') return miniNotebook(g) + fullPersonal(g,visible);
+      const self = g.self, criminal = ['culprit','accomplice'].includes(self.role);
+      const information = identity(g) + identityHistory(g) + clues(g) + (criminal && g.caseSecret ? '<section class="seven-crime-brief"><h3>범인 진영에만 전달된 진상</h3><p>' + esc(personName(g.caseSecret.suspectId) + ' / ' + placeName(g.caseSecret.placeId) + ' / ' + (D.TOOLS.find(t => t.id === g.caseSecret.toolId)?.name || '') + ' / ' + (D.TIMES.find(t => t.id === g.caseSecret.timeId)?.name || '')) + '</p><p>함께하는 닉네임: ' + esc((g.partnerIds || []).map(id => memberName(g,id)).join(', ') || '없음') + '</p></section>' : '');
+      const controls = (g.phase === 'answer' ? answerControls(g) : '') + secretControls(g) + investigation(g) + (g.phase === 'discussion' && self.role === 'detective' ? button('review','도착한 답변·기록 검토') : '') + (g.phase === 'final' && self.role === 'detective' ? accuse(g) : '');
+      return '<div class="seven-private seven-private-compact"><header class="seven-private-head"><small>' + day(g) + ' / ' + esc(g.phase === 'secret' ? '동시 비밀 준비' : PHASES[g.phase]) + '</small><h2>' + esc(self.name) + ' · ' + esc(role(self.role)) + '</h2></header>' + miniNotebook(g) + '<nav class="seven-private-tabs">' + [['actions','오늘의 행동'],['information','내 정보'],['participation',self.role === 'detective' ? '증언·제안 검토' : '증언·제안']].map(([id,label]) => button('private-pane',label,' data-id="' + id + '" aria-pressed="' + (privatePane === id) + '"')).join('') + '</nav><div class="seven-private-pane">' + (privatePane === 'information' ? information : privatePane === 'participation' ? freeParticipation(g) : controls || '<p class="notice">지금은 다른 참가자의 답변·수사 검토를 기다립니다. 내 정보와 증언·제안을 열어 함께 참여하세요.</p>') + '</div></div>';
     }
     function review(g) {
       if (g.phase !== 'discussion' || g.self?.role !== 'detective') return '';
@@ -331,7 +434,7 @@
       });
     }
     function open(kind, title, body) { cancelTypes(); config.openModal?.('seven-' + kind, title, '<div id="seven-window-body">' + body + '</div>'); modalSignature = ''; animate(); }
-    function openPersonal() { const g = getGame(); if (!g || g.phase === 'finished') return; if (g.phase === 'discussion' && g.self.role === 'detective') { openReview(); return; } open('personal', isMine(g) ? '나의 차례 · 비밀 수첩' : '나만 보는 비밀 수첩', personal(g, !!config.privateVisible?.())); }
+    function openPersonal() { const g = getGame(); if (!g || g.phase === 'finished') return; if (g.phase === 'discussion' && g.self.role === 'detective') { openReview(); return; } open('personal', canPrepare(g) ? '오늘의 비밀 준비 · 나의 수첩' : isMine(g) ? '나의 차례 · 비밀 수첩' : '나만 보는 비밀 수첩', personal(g, !!config.privateVisible?.())); }
     function openReview() { const g = getGame(); if (g?.phase === 'discussion' && g.self?.role === 'detective') open('review', '도착한 답변·기록 검토', review(g)); }
     function refresh(force) {
       const g = getGame(), kind = current(); if (!g || !kind.startsWith('seven-') || kind === 'seven-story') return;
@@ -362,10 +465,10 @@
         const waiting = nextSealNotice(g);
         if (waiting) { sealNotice = waiting; openSealNotice(); return; }
       }
-      const key = caseId + ':' + g.round + ':' + g.phase + ':' + g.turnOwnerId;
-      if (isMine(g) && key !== cueKey) { cueKey = key; if (g.phase === 'discussion') openReview(); else openPersonal(); }
+      const key = caseId + ':' + g.round + ':' + g.phase + ':' + (modernFlow(g) && g.phase === 'secret' ? g.self.id : g.turnOwnerId);
+      if ((canPrepare(g) || isMine(g) && !(modernFlow(g) && g.phase === 'secret')) && key !== cueKey) { cueKey = key; actionNotebook = null; privatePane = 'actions'; if (g.phase === 'discussion') openReview(); else openPersonal(); }
     }
-    function reset() { cancelTypes(); cueKey = ''; storyCase = ''; endingShown = ''; modalSignature = ''; boardTab = 'person'; detailSelection = null; sealNotice = null; readNotices.clear(); replayDay = 'all'; replayStep = 0; Object.values(marked).forEach(set => set.clear()); }
+    function reset() { cancelTypes(); cueKey = ''; storyCase = ''; endingShown = ''; modalSignature = ''; boardTab = 'person'; detailSelection = null; actionNotebook = null; privatePane = 'actions'; secretPane = 'memory'; sealNotice = null; readNotices.clear(); replayDay = 'all'; replayStep = 0; Object.values(marked).forEach(set => set.clear()); }
     function privacy() { cancelTypes(); if (['seven-personal', 'seven-notice', 'seven-ending'].includes(current())) config.closeModal?.(); }
     async function handle(action, data) {
       if (!action.startsWith('seven-')) return false;
@@ -381,6 +484,18 @@
         readNotices.add(sealNotice.key); config.sessionSet?.(sealNotice.key, '1'); sealNotice = null; config.setPrivateVisible?.(false); config.closeModal?.(); cueKey = ''; pump(); return true;
       }
       if (action === 'seven-board-tab') { if (['person','place','tool','time'].includes(d.id)) { boardTab = d.id; config.render?.(); } return true; }
+      if (action === 'seven-action-notebook') { if (config.privateVisible?.() && ['person','place','tool','time'].includes(d.id)) { actionNotebook = { kind:d.id }; refresh(true); } return true; }
+      if (action === 'seven-action-detail') { if (config.privateVisible?.() && actionNotebook && catalog(d.kind).some(item => item.id === d.id)) { actionNotebook = { kind:d.kind,detailId:d.id }; refresh(true); } return true; }
+      if (action === 'seven-action-back') { if (actionNotebook?.detailId) actionNotebook = { kind:actionNotebook.kind }; else actionNotebook = null; refresh(true); return true; }
+      if (action === 'seven-source-view') { if (config.privateVisible?.() && recordOptions(g).some(r => r.id === d.id && r.acquired)) { actionNotebook = { recordId:d.id }; refresh(true); } return true; }
+      if (action === 'seven-private-pane') { if (['actions','information','participation'].includes(d.id)) { privatePane = d.id; actionNotebook = null; refresh(true); } return true; }
+      if (action === 'seven-secret-pane') { if (['memory','report','guard','seal'].includes(d.id)) { secretPane = d.id; refresh(true); } return true; }
+      if (action === 'seven-adopt-testimony') {
+        const offer = (g.suggestions || []).find(s => s.id === d.id && s.kind === 'testimony');
+        if (g.self?.role === 'detective' && g.phase === 'investigate' && offer && questionChoices(g).some(c => c.id === offer.category && c.proposedValues.includes(offer.value))) { drafts['seven-question-target'] = offer.speakerId; drafts['seven-question-category'] = offer.category; drafts['seven-question-proposed'] = String(offer.value); selectedTab = 'question'; privatePane = 'actions'; refresh(true); config.toast?.('질문 초안을 가져왔습니다. 대상과 이전 기록을 확인하고 질문을 확정하세요.'); }
+        else { config.toast?.('이미 해결된 항목입니다. 최신 기록에서 다른 질문을 선택해 주세요.'); refresh(true); }
+        return true;
+      }
       if (action === 'seven-card-detail') { if (['person','place','tool','time'].includes(d.kind)) { detailSelection = { kind: d.kind, id: d.id }; open('detail', '사건 자료 자세히 보기', detail(g)); } return true; }
       if (action === 'seven-personal') { openPersonal(); return true; }
       if (action === 'seven-private-show') { config.setPrivateVisible?.(true); openPersonal(); return true; }
@@ -392,15 +507,27 @@
       if (action === 'seven-clear-marks') { Object.values(marked).forEach(set => set.clear()); config.render?.(); return true; }
       if (action === 'seven-tab') { if (['question', 'search', 'audit'].includes(d.id)) selectedTab = d.id; refresh(true); return true; }
       if (action === 'seven-accuse-select') { if (g.phase === 'final' && g.self.role === 'detective' && isMine(g) && finalPeople(g).some(p => p.id === d.id)) { drafts.sevenAccusedPerson = d.id; refresh(true); } return true; }
-      if (pending() || !isMine(g)) return true;
+      if (modernFlow(g) && !pending() && !['reveal','finished'].includes(g.phase)) {
+        let freeEvent = null;
+        if (action === 'seven-free-suggest' && g.self.role !== 'detective' && category(read('seven-free-category'))) freeEvent = { type:'SUGGEST',category:read('seven-free-category'),text:read('seven-free-text').trim() };
+        if (action === 'seven-offer-testimony' && g.self.role !== 'detective') { const c = category(read('seven-testimony-category')), value = Number(read('seven-testimony-value')); if (c && Number.isInteger(value) && value >= 0 && value < c.values.length) freeEvent = { type:'OFFER_TESTIMONY',category:c.id,value,text:read('seven-testimony-text').trim() }; }
+        if (action === 'seven-identity-guess' && g.self.role === 'suspect' && person(read('seven-identity-guess'))) freeEvent = { type:'IDENTITY_MEMO',suspectId:read('seven-identity-guess'),text:read('seven-identity-text').trim() };
+        if (freeEvent) { await config.send?.(freeEvent); return true; }
+      }
+      if (pending() || !isMine(g) && !canPrepare(g)) return true;
       let event = null;
       if (action === 'seven-role-seen' && g.phase === 'reveal') event = { type: 'ROLE_SEEN' };
-      if (g.phase === 'secret') {
+      if (canPrepare(g)) {
         if (action === 'seven-memory' && g.self.role === 'suspect' && g.self.identity?.memoryLeft > 0) event = { type: 'SECRET_ACTION', kind: 'memory' };
         if (action === 'seven-report-submit' && reportAvailable(g)) { const suspectId = read('seven-report-person'), text = read('seven-report-reason').trim(); if (person(suspectId) && text) event = { type: 'SECRET_ACTION', kind: 'report', suspectId, text }; else config.toast?.('제보할 인물과 이유를 입력해 주세요.'); }
-        if (action === 'seven-identity-guess' && g.self.role === 'suspect' && person(read('seven-identity-guess'))) event = { type: 'SECRET_ACTION', kind: 'suggest', suspectId: read('seven-identity-guess'), text: '나의 정체 추정 메모' };
-        if (['seven-seal', 'seven-guard', 'seven-suggest'].includes(action) && category(read('seven-secret-category'))) event = { type: 'SECRET_ACTION', kind: action.slice(6), category: read('seven-secret-category') };
-        if (action === 'seven-secret-pass') event = { type: 'SECRET_ACTION', kind: 'pass' };
+        if (!modernFlow(g) && action === 'seven-identity-guess' && g.self.role === 'suspect' && person(read('seven-identity-guess'))) event = { type: 'SECRET_ACTION', kind: 'suggest', suspectId: read('seven-identity-guess'), text: '나의 정체 추정 메모' };
+        if (['seven-seal', 'seven-guard', 'seven-suggest'].includes(action) && category(read('seven-secret-category'))) {
+          const c = read('seven-secret-category'), ability = action === 'seven-suggest' || abilityOptions(g).some(entry => entry.id === c && entry.available !== false);
+          if (ability) event = { type: 'SECRET_ACTION', kind: action.slice(6), category:c };
+          else { config.toast?.('이 항목은 이미 해결되어 능력을 사용할 수 없습니다. 횟수를 쓰지 않았습니다.'); refresh(true); }
+        }
+        if (action === 'seven-ready' && modernFlow(g)) event = { type:'SECRET_ACTION',kind:'ready' };
+        if (action === 'seven-secret-pass') event = { type: 'SECRET_ACTION', kind: modernFlow(g) ? 'ready' : 'pass' };
       }
       if (g.phase === 'answer' && action === 'seven-answer') { const c = category(g.pending?.category), criminal = ['culprit', 'accomplice'].includes(g.self.role), value = d.value === 'unknown' ? null : Number(d.value), actual = criminal ? truth(g, c?.id) : known(g, c?.id); if (g.self.answerOptions?.legalValues ? g.self.answerOptions.legalValues.includes(value) : value === null ? criminal ? g.remainingRefusals > 0 : !Number.isInteger(actual) : c && Number.isInteger(value) && value >= 0 && value < c.values.length && (criminal ? value === actual || g.remainingLies > 0 : value === actual)) event = { type: 'ANSWER', value }; }
       if (g.self.role === 'detective' && g.phase === 'investigate') {
@@ -409,7 +536,7 @@
           if (c && c.proposedValues.includes(proposedValue) && g.players.some(p => p.id === targetId && p.id !== g.self.id)) event = { type: 'QUESTION', targetId, category: c.id, proposedValue };
           else { config.toast?.('질문할 미확인 항목과 확인하려는 진술을 다시 선택해 주세요.'); refresh(true); }
         }
-        if (action === 'seven-search' && D.RECORDS.some(r => r.id === d.id)) event = { type: 'SEARCH', recordId: d.id };
+        if (action === 'seven-search' && recordOptions(g).some(r => r.id === d.id && !r.acquired && r.available !== false)) event = { type: 'SEARCH', recordId: d.id };
         if (action === 'seven-audit' && g.kits > 0 && g.statements.some(s => s.id === d.id && !s.audited)) event = { type: 'AUDIT', statementId: d.id };
         if (action === 'seven-investigate-pass') event = { type: 'INVESTIGATE', kind: 'pass' };
       }

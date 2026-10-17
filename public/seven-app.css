@@ -51,3 +51,111 @@
 @media(max-width:580px){.seven-time-overlay{font-size:8px;padding:5px 1px;left:3%;right:3%;bottom:5%}.seven-detail .seven-time-overlay{font-size:9px}.seven-source-group{padding:8px 9px}.seven-source-chips>span{font-size:9px;padding:4px 6px}.seven-solution-grid .seven-time-overlay{font-size:10px}}
 
 .seven-route-table{margin-top:12px;max-height:270px}.seven-route-table table{min-width:360px;font-size:10px}.seven-route-table th,.seven-route-table td{padding:9px 10px}.seven-route-group>.case-caption{font-size:10px;line-height:1.9;margin-top:11px}.seven-source-links>.case-caption{font-size:11px;line-height:1.9;margin:3px 0 8px}@media(max-width:580px){.seven-source-links>.case-caption{font-size:10px}.seven-route-table table{font-size:9px;min-width:330px}.seven-route-table th,.seven-route-table td{padding:8px}}
+
+/* The same private action window becomes the reference notebook and returns to its draft. */
+.seven-action-notebook{display:grid;grid-template-columns:56px repeat(4,minmax(0,1fr));align-items:center;gap:5px;position:sticky;top:0;z-index:9;padding:9px 0;background:#121b15f7;border-top:1px solid #786848;border-bottom:1px solid #786848;backdrop-filter:blur(12px)}
+.seven-action-notebook>span{font-size:10px;color:#b8a578}.seven-action-notebook .btn{min-height:45px;padding:7px 5px;font-size:11px;margin:0;display:grid;line-height:1.35}.seven-action-notebook b{display:block;font:9px/1.3 Consolas,monospace;opacity:.7;margin-top:3px}.seven-action-notebook button[aria-pressed=true],.seven-private-tabs button[aria-pressed=true],.seven-preparation-tabs button[aria-pressed=true]{color:#efd89d;border-color:#c5a96d;background:#b2984f28}
+.seven-private-tabs,.seven-preparation-tabs{display:flex;gap:6px;margin:12px 0}.seven-private-tabs .btn,.seven-preparation-tabs .btn{flex:1;margin:0;min-height:42px;padding:9px 7px;font-size:11px}.seven-private-compact .seven-private-head{margin-bottom:13px}.seven-private-compact .seven-private-head h2{font-size:23px;margin:7px 0}.seven-private-pane{min-height:160px}.seven-preparation h3{font-size:20px;margin:15px 0}.seven-preparation h3 small{font-size:10px;display:block;color:#b5a77d;margin-top:7px}.seven-preparation>.btn[data-ready]{width:100%;margin-top:12px;border-color:#9c9668}.seven-free-participation h3{font-size:18px}.seven-free-suggestion{padding:12px;border:1px solid #646449;margin:12px 0}.seven-free-suggestion>summary{font-size:13px;cursor:pointer;color:#d1c494}.seven-free-suggestion .field:first-of-type{margin-top:16px}.seven-free-participation textarea,.seven-preparation textarea{min-height:68px;max-height:120px}.seven-free-participation .seven-action-card{margin:12px 0}.seven-question-history{padding:12px;border:1px solid #626043;background:#ad965315;margin:12px 0;font-size:11px}.seven-question-history h4{font-size:12px;margin:0 0 8px;color:#d3c38d}.seven-question-history p{margin:6px 0;line-height:1.75}.seven-question-history b,.seven-question-history span{display:block;font-size:10px;font-weight:400;color:#b7ba9c}.seven-action-check{font-size:10px!important;color:#c2b17f}.seven-record-options .is-acquired{border-color:#626a50;background:#a2aa7412}.seven-record-options small{display:block;font-size:10px;margin-top:8px;color:#a8ad90}
+.seven-action-card-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:12px}.seven-action-reference{position:relative;border:1px solid #74704b;background:#182119;color:#d2c295;text-align:left;min-width:0;overflow:hidden}.seven-action-reference .seven-art{aspect-ratio:1.22}.seven-action-reference>strong{display:block;font-size:12px;margin:7px 7px 4px;line-height:1.4;font-weight:500}.seven-action-reference>small{display:block;font-size:8px;margin:0 7px 8px;color:#a5ae8e}.seven-action-reference.is-constrained .seven-art,.seven-action-reference.is-marked .seven-art{filter:grayscale(1) brightness(.65)}.seven-action-reference.is-constrained>small{color:#d49482}.seven-action-reference.is-marked:not(.is-constrained)>small{color:#c1b16f}.seven-action-reference .seven-pencil-x{top:0;width:75%;left:12%;height:70%}.seven-action-catalog>.btn,.seven-inline-detail>.btn,.seven-inline-source>.btn{margin:12px 0 5px}.seven-inline-source{font-size:12px;line-height:1.8}.seven-inline-detail .seven-detail{margin-top:15px}.seven-inline-detail .seven-detail-art{max-width:140px}.seven-inline-detail .seven-source-group{padding:8px}.seven-inline-detail .seven-source-links{font-size:10px}
+.seven-exclusion-basis{margin-top:14px;border:1px solid #86574b;padding:13px;font-size:11px;line-height:1.85;color:#c0b293}.seven-exclusion-basis>summary{color:#d5a18b;cursor:pointer}.seven-exclusion-basis ul{padding-left:19px}.seven-exclusion-basis li{margin:7px 0}
+.seven-personal-mark{position:absolute;top:5px;left:5px;z-index:2;padding:4px 5px;background:#342e19ec;border:1px solid #a28c4f;color:#e3c98c;font-size:7px;font-style:normal}.seven-action-reference.is-private-constrained>small{color:#c8ba82}.seven-exclusion-basis h4{margin:0 0 8px;color:#dfb79b;font-size:13px}.seven-exclusion-basis article{border-top:1px solid #765d453d;margin-top:8px;padding-top:8px}.seven-exclusion-basis article small{color:#cbb883}.seven-exclusion-basis article p{margin:4px 0}
+@media(max-width:580px){.seven-action-notebook{grid-template-columns:43px repeat(4,minmax(0,1fr));gap:4px;padding:7px 0}.seven-action-notebook>span{font-size:9px}.seven-action-notebook .btn{min-height:42px;font-size:10px;padding:6px 2px}.seven-action-notebook b{font-size:8px}.seven-private-compact .seven-private-head h2{font-size:19px}.seven-private-compact .seven-private-head small{font-size:9px}.seven-private-tabs,.seven-preparation-tabs{gap:4px;margin:9px 0}.seven-private-tabs .btn,.seven-preparation-tabs .btn{font-size:9px;min-height:39px;padding:7px 3px}.seven-private-compact .seven-action-card{padding:12px;margin:10px 0}.seven-private-compact .seven-action-card h4{font-size:13px;margin:0 0 8px}.seven-private-compact .seven-action-card p,.seven-preparation>.case-caption,.seven-free-participation>.case-caption{font-size:10px;line-height:1.7}.seven-private-compact .field{margin:9px 0}.seven-private-compact .field>span{font-size:10px}.seven-private-compact select{min-height:41px;font-size:11px;padding:8px}.seven-private-compact textarea{min-height:57px;font-size:11px;padding:9px}.seven-preparation h3{font-size:17px;margin:12px 0}.seven-preparation h3 small{font-size:9px}.seven-preparation>.btn[data-ready]{font-size:10px;min-height:42px;padding:9px}.seven-action-card-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.seven-action-reference .seven-art{aspect-ratio:1.4}.seven-action-reference>strong{font-size:10px;margin:5px 5px 3px;line-height:1.35}.seven-action-reference>small{font-size:7px;margin:0 5px 6px}.seven-action-catalog>.case-caption{font-size:9px;margin:9px 0}.seven-action-catalog>.btn,.seven-inline-detail>.btn,.seven-inline-source>.btn{font-size:10px;padding:9px;min-height:38px}.seven-question-history{padding:9px;font-size:10px}.seven-question-history h4{font-size:11px}.seven-question-history b,.seven-question-history span{font-size:9px}.seven-action-check{font-size:9px!important}.seven-private-compact .seven-directions .record-card{padding:11px}.seven-private-compact .seven-directions{margin-top:12px}.seven-private-compact .seven-directions>h3{font-size:15px}.seven-private-compact .seven-directions>h3 small{font-size:9px}.seven-inline-detail .seven-detail{grid-template-columns:80px minmax(0,1fr);gap:12px}.seven-inline-detail .seven-detail-info h3{font-size:19px}}
+
+/* Keep all twelve quick-reference cards inside the mobile action window. */
+@media(max-width:580px){.seven-action-reference .seven-art{aspect-ratio:1.8}.seven-action-reference>strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.seven-action-reference>small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.seven-action-catalog>.case-caption{line-height:1.55}}
+@media(max-width:580px) and (max-height:740px){.seven-action-card-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.seven-action-reference .seven-art{aspect-ratio:1.65}.seven-action-catalog>.case-caption{margin:6px 0}.seven-action-card-grid{margin-top:8px}}
+@media(max-width:580px) and (max-height:740px){.case-modal-root .modal:has(.seven-action-catalog) .modal-head{padding:4px 0 8px;margin-bottom:8px}.case-modal-root .modal:has(.seven-action-catalog) .modal-head .eyebrow{display:none}.case-modal-root .modal:has(.seven-action-catalog) .modal-head h2{font-size:16px;line-height:1.4}}
+
+/* Action drafting keeps the reference tabs, inputs and confirmation in one mobile view. */
+.seven-question-history>summary,.seven-action-help>summary{cursor:pointer;color:#d3c38d;line-height:1.5;min-height:32px;display:list-item;align-content:center}
+.seven-question-history[open]{max-height:180px;overflow:auto;scrollbar-width:thin;overscroll-behavior:contain}
+.seven-action-help{font-size:10px;color:#aeb59a}
+.seven-action-help>p{line-height:1.65;margin:7px 0}
+.seven-action-help[open]{max-height:115px;overflow:auto;scrollbar-width:thin}
+@media(max-width:580px){
+  .case-modal-root .modal:has(.seven-private-compact){padding:10px 12px}
+  .case-modal-root .modal:has(.seven-private-compact) .modal-head{top:-10px;padding:0 0 7px;margin-bottom:8px;gap:7px;align-items:center;flex-wrap:nowrap}
+  .case-modal-root .modal:has(.seven-private-compact) .modal-head .eyebrow{display:none}
+  .case-modal-root .modal:has(.seven-private-compact) .modal-head h2{font-size:16px;line-height:1.35;margin:0}
+  .case-modal-root .modal:has(.seven-private-compact) .modal-head .close-btn,
+  .case-modal-root .modal:has(.seven-private-compact) .modal-head>.case-ledger-launch{min-width:44px;min-height:44px;display:grid;place-items:center;padding:7px}
+  .seven-private-compact .seven-private-head{padding-bottom:7px;margin-bottom:7px;display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
+  .seven-private-compact .seven-private-head h2{font-size:15px;margin:0;line-height:1.4}
+  .seven-private-compact .seven-private-head small{font-size:8px;line-height:1.4}
+  .seven-private-compact .seven-action-notebook{padding:4px 0;gap:3px;position:relative}
+  .seven-private-compact .seven-action-notebook .btn{min-height:44px;padding:4px 2px;font-size:10px}
+  .seven-private-compact .seven-private-tabs{margin:6px 0;gap:4px}
+  .seven-private-compact .seven-private-tabs .btn{min-height:44px;padding:5px 3px;font-size:10px}
+  .seven-private-compact .seven-private-pane{min-height:0}
+  .seven-private-compact .seven-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:4px;padding:6px 0 0}
+  .seven-private-compact .seven-actions>:not(.btn){grid-column:1/-1}
+  .seven-private-compact .seven-actions>h3{margin:0;font-size:15px;line-height:1.5;display:flex;align-items:baseline;gap:8px}
+  .seven-private-compact .seven-actions>h3 small{font-size:9px;display:inline;margin:0}
+  .seven-private-compact .seven-actions>.seven-tabs{margin:0;flex-wrap:nowrap;gap:4px}
+  .seven-private-compact .seven-actions>.seven-tabs .btn{min-height:44px;padding:5px 3px;font-size:10px;margin:0}
+  .seven-private-compact .seven-actions>p{margin:0;font-size:10px;line-height:1.55}
+  .seven-private-compact .seven-actions>.form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:0}
+  .seven-private-compact .seven-actions>.form-grid>.field{margin:0;gap:4px}
+  .seven-private-compact .seven-actions>.form-grid>.field:last-child{grid-column:1/-1}
+  .seven-private-compact .seven-actions .field>span{font-size:9px;line-height:1.4}
+  .seven-private-compact .seven-actions select{min-height:44px;padding:7px 6px;font-size:11px}
+  .seven-private-compact .seven-actions>.btn{width:100%;min-height:44px;min-width:0;padding:7px 5px;margin:0;font-size:10px;line-height:1.45}
+  .seven-private-compact .seven-action-check{font-size:8px!important;line-height:1.45!important}
+  .seven-private-compact .seven-question-history{padding:5px 8px;margin:0;font-size:9px}
+  .seven-private-compact .seven-question-history>summary{font-size:10px;min-height:32px}
+  .seven-private-compact .seven-question-history h4{font-size:10px;margin:0 0 4px}
+  .seven-private-compact .seven-question-history p{margin:4px 0;line-height:1.5}
+  .seven-private-compact .seven-question-history b,.seven-private-compact .seven-question-history span{font-size:9px}
+  .seven-private-compact .seven-record-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;max-height:calc(100dvh - 400px);min-height:100px;overflow:auto;scrollbar-width:thin;overscroll-behavior:contain}
+  .seven-private-compact .seven-record-options .seven-action-card{padding:8px;margin:0;display:flex;flex-direction:column;gap:5px}
+  .seven-private-compact .seven-record-options .seven-action-card h4{font-size:11px;margin:0;line-height:1.4}
+  .seven-private-compact .seven-record-options .seven-action-card p{font-size:9px;line-height:1.45;margin:0}
+  .seven-private-compact .seven-record-options .seven-action-card .btn{min-height:44px;font-size:10px;padding:6px 4px;margin:auto 0 0}
+  .seven-private-compact .seven-record-options small{font-size:8px;margin:0;line-height:1.4}
+  .seven-private-compact .seven-audit-options{display:grid;gap:6px;max-height:calc(100dvh - 400px);min-height:80px;overflow:auto;scrollbar-width:thin;overscroll-behavior:contain}
+  .seven-private-compact .seven-audit-options .seven-action-card{padding:8px;margin:0;display:grid;grid-template-columns:minmax(0,1fr) 112px;align-items:center;gap:8px}
+  .seven-private-compact .seven-audit-options .seven-action-card p{font-size:10px;line-height:1.55;margin:0}
+  .seven-private-compact .seven-audit-options .seven-action-card .btn{min-height:44px;font-size:10px;padding:6px 4px;margin:0}
+  .seven-private-compact .seven-preparation h3{display:flex;align-items:baseline;flex-wrap:wrap;gap:7px;font-size:15px;line-height:1.45;margin:7px 0}
+  .seven-private-compact .seven-preparation h3 small{display:inline;font-size:9px;margin:0}
+  .seven-private-compact .seven-preparation>.case-caption{font-size:9px;line-height:1.45;margin:5px 0}
+  .seven-private-compact .seven-preparation-tabs{margin:6px 0;gap:4px}
+  .seven-private-compact .seven-preparation-tabs .btn{min-height:44px;padding:5px 3px;font-size:10px}
+  .seven-private-compact .seven-preparation .seven-action-card{padding:9px;margin:7px 0}
+  .seven-private-compact .seven-preparation .seven-action-card h4{font-size:12px;margin:0 0 5px;line-height:1.4}
+  .seven-private-compact .seven-preparation .seven-action-card p{font-size:9px;line-height:1.5;margin:5px 0}
+  .seven-private-compact .seven-preparation .field{margin:6px 0;gap:4px}
+  .seven-private-compact .seven-preparation .field>span{font-size:9px;line-height:1.4}
+  .seven-private-compact .seven-preparation select{min-height:44px;padding:6px;font-size:11px}
+  .seven-private-compact .seven-preparation textarea{min-height:44px;max-height:64px;padding:6px;font-size:11px}
+  .seven-private-compact .seven-preparation .seven-action-card>.btn,.seven-private-compact .seven-preparation>.btn[data-ready]{min-height:44px;padding:6px;margin:5px 0 0;font-size:10px}
+  .seven-private-compact .seven-question-paper{padding:10px;margin-top:6px}
+  .seven-private-compact .seven-question-paper h3{font-size:15px;line-height:1.5;margin:8px 0}
+  .seven-private-compact .seven-question-paper>.seven-hand{font-size:19px!important;line-height:1.5!important;min-height:0;margin:8px 0}
+  .seven-private-compact .seven-question-paper>p:not(.seven-hand){font-size:9px;line-height:1.5;margin:7px 0}
+  .seven-private-compact .seven-answer-options{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:9px 0}
+  .seven-private-compact .seven-answer-options .btn{font-size:9px;line-height:1.35;min-height:44px;padding:5px;text-align:center;justify-content:center}
+  .seven-private-compact .seven-answer-options .btn:focus-visible,
+  .seven-private-compact .seven-actions .btn:focus-visible{outline:2px solid #e3c583;outline-offset:2px}
+}
+@media(max-width:580px) and (max-height:740px){
+  .case-modal-root .modal:has(.seven-private-compact){padding:8px 10px}
+  .case-modal-root .modal:has(.seven-private-compact) .modal-head{top:-8px;padding-bottom:4px;margin-bottom:4px}
+  .seven-private-compact:has(.seven-private-tabs [data-id="actions"][aria-pressed="true"]) .seven-private-head{display:none}
+  .seven-private-compact .seven-action-notebook{padding:3px 0}
+  .seven-private-compact .seven-private-tabs{margin:4px 0}
+  .seven-private-compact .seven-actions{gap:4px;padding-top:4px;margin-top:0}
+  .seven-private-compact .seven-actions>h3{font-size:13px;line-height:1.4}
+  .seven-private-compact .seven-actions>.form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;align-items:end}
+  .seven-private-compact .seven-actions>.form-grid>.field:last-child{grid-column:1/-1}
+  .seven-private-compact .seven-actions .field>span{font-size:8px}
+  .seven-private-compact .seven-question-history{padding:3px 7px}
+  .seven-private-compact .seven-question-history[open]{max-height:100px}
+  .seven-private-compact .seven-action-help>summary{min-height:28px;font-size:9px}
+  .seven-private-compact .seven-question-paper{padding:8px;margin-top:4px}
+  .seven-private-compact .seven-question-paper h3{font-size:13px;line-height:1.4;margin:5px 0}
+  .seven-private-compact .seven-question-paper>.seven-hand{font-size:16px!important;line-height:1.35!important;margin:5px 0}
+  .seven-private-compact .seven-question-paper>p:not(.seven-hand){font-size:8px;line-height:1.4;margin:5px 0}
+  .seven-private-compact .seven-answer-options{grid-template-columns:repeat(4,minmax(0,1fr));margin:5px 0;gap:4px}
+  .seven-private-compact .seven-answer-options .btn{font-size:8px;padding:4px 3px;min-height:44px;line-height:1.3}
+}

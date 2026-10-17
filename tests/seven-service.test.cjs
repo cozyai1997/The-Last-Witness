@@ -21,6 +21,8 @@ test('authenticated six-seat v4 service preserves private identity/report throug
   const service = createService({ store: new MemoryStore(), sessionSecret: 'seven-service-only', rateLimit: 10000, gameOptions: { rulesVersion: 4, seed: 71 } });
   const result = await runSevenFlow(async body => { try { return { status: 200, data: await service.handle(body, { ip: 'seven-integration' }) }; } catch (error) { return { status: error.status, data: { code: error.code } }; } });
   assert.equal(result.cases.length, 4); assert.ok(result.privateChecks > 200); assert.equal(result.replayComparisons, 24); assert.equal(result.credentialsSaved, false); assert.equal(result.pairedRoutes, true); assert.equal(result.pairedRouteChecks, 1728);
+  assert.equal(result.simultaneousPreparation, true); assert.ok(result.nonOwnerPreparations >= 100); assert.ok(result.preparationChecks > 100);
+  assert.equal(result.freeEventChecks, 3);
 });
 
 test('v4 service binds actor identity, validates strict inputs, and CAS receipts cannot consume a turn twice', async () => {
@@ -58,5 +60,5 @@ test('new default is v4 while persisted explicit legacy rooms remain byte-for-by
   let newRoom = (await fresh.handle({ op: 'create', token: freshTokens[0], capacity: 2, requestId: crypto.randomUUID() }, { ip: 'new' })).room;
   newRoom = (await fresh.handle({ op: 'join', token: freshTokens[1], code: newRoom.code, requestId: crypto.randomUUID() }, { ip: 'new' })).room;
   for (const token of freshTokens) newRoom = (await fresh.handle({ op: 'ready', token, ready: true, revision: newRoom.revision, requestId: crypto.randomUUID() }, { ip: 'new' })).room;
-  newRoom = (await fresh.handle({ op: 'start', token: freshTokens[0], revision: newRoom.revision, requestId: crypto.randomUUID() }, { ip: 'new' })).room; assert.equal(newRoom.game.rulesVersion, 4); assert.equal(newRoom.game.maxRounds, 7);
+  newRoom = (await fresh.handle({ op: 'start', token: freshTokens[0], revision: newRoom.revision, requestId: crypto.randomUUID() }, { ip: 'new' })).room; assert.equal(newRoom.game.rulesVersion, 4); assert.equal(newRoom.game.maxRounds, 7); assert.equal(newRoom.game.flowVersion, 2);
 });

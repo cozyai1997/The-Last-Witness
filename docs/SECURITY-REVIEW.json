@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-10-17T10:24:42.605Z",
+  "generatedAt": "2026-10-17T12:36:52.958Z",
   "status": "PASS",
   "sourceSHA256": {
     "lib/passwords.cjs": "91cbebd77f19093a156a3e19683f13549659e4ac863dec81230c838a144d4f69",
-    "lib/game-service.cjs": "57512b34ff2ef29906381a2ac82839a74edb1c5f9a6d8aa524288969e7572ec0",
+    "lib/game-service.cjs": "ce68a5d890429890c22caf714a58800991e505f8f3977197f9801686eacbc6a0",
     "lib/party-engine.cjs": "b80c0598bee3a4897e7a14a3e1a006f7df127c3182746cfec0975188ef42cc56"
   },
   "scope": "Independent in-process service review with fresh MemoryStore fixtures; no live credentials, HTTP deployment, SQL execution or browser automation",

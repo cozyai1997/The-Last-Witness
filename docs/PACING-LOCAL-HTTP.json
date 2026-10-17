@@ -1,0 +1,75 @@
+{
+  "base": "http://127.0.0.1:4217",
+  "transport": "real-http",
+  "passed": true,
+  "checkedAt": "2026-10-17T12:30:49.462Z",
+  "rulesVersion": 4,
+  "finalInput": "person-only",
+  "catalog": {
+    "people": 12,
+    "places": 12,
+    "tools": 12,
+    "times": 12
+  },
+  "pairedRoutes": true,
+  "fieldReferenceVersion": 2,
+  "pairedRouteChecks": 1728,
+  "preparationChecks": 200,
+  "nonOwnerPreparations": 140,
+  "freeEventChecks": 3,
+  "simultaneousPreparation": true,
+  "sessions": 7,
+  "simultaneousPlayers": 6,
+  "cases": [
+    {
+      "scenario": "correct-character",
+      "days": 7,
+      "team": "investigators",
+      "suspect": "win",
+      "replayIdentical": true
+    },
+    {
+      "scenario": "dual-success",
+      "days": 7,
+      "team": "criminals",
+      "suspect": "win",
+      "replayIdentical": true
+    },
+    {
+      "scenario": "self-accusation-priority",
+      "days": 7,
+      "team": "criminals",
+      "suspect": "loss",
+      "replayIdentical": true
+    },
+    {
+      "scenario": "neutral-deadline",
+      "days": 7,
+      "team": "investigators",
+      "suspect": "survived",
+      "replayIdentical": true
+    }
+  ],
+  "requests": 558,
+  "maxRequestMs": 275,
+  "averageRequestMs": 12,
+  "privateChecks": 447,
+  "replayComparisons": 24,
+  "reLogins": 13,
+  "memory": "3-2-1",
+  "sealedReportPrivacy": true,
+  "reportOnce": true,
+  "day6OwnTurnDeadline": true,
+  "earlyAccusationBlocked": true,
+  "accountResume": true,
+  "oldTokenRevoked": true,
+  "actorBoundToSession": true,
+  "actualCCharacter": true,
+  "dualSuccess": true,
+  "selfAccusationPriority": true,
+  "neutralNoReport": true,
+  "sharedLiesAndRefusal": true,
+  "auditVerdictOnly": true,
+  "restart": true,
+  "credentialsSaved": false
+}

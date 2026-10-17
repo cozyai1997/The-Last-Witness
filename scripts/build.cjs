@@ -17,7 +17,7 @@ fs.writeFileSync(path.join(root,'public/practice-engine.js'),engineSource.replac
 const sevenSource = fs.readFileSync(path.join(root,'lib/seven-engine.cjs'),'utf8');
 if(!sevenSource.includes('WitnessSevenEngine')) throw new Error('Seven-day practice boundary missing');
 fs.writeFileSync(path.join(root,'public/seven-practice-engine.js'),sevenSource);
-for(const file of ['seven-data.js','seven-app.js','seven-app.css','seven-practice.js','seven-practice-engine.js']) {
+for(const file of ['seven-data.js','seven-actions.js','seven-app.js','seven-app.css','seven-practice.js','seven-practice-engine.js']) {
   if(!fs.existsSync(path.join(root,'public',file))) throw new Error('Missing seven-day file: '+file);
 }
 for(const file of ['index.html','online-app.js','online.css','fx.js','style.css','assets.css','party.css','party-assets.css','party-rules.html','bgm.js','practice.js','practice-engine.js','detective-options.js','case-replay.js','case-replay.css','case-interface.js','case-interface.css','case-presentation.js','case-presentation.css','fonts/handwriting.woff2','fonts/OFL.txt','audio/witness-noir-loop.mp3']) {

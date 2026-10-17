@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const enginePath = require('node:path').join(__dirname, '../lib/seven-engine.cjs');
 function api() { assert.ok(fs.existsSync(enginePath), 'Seven engine must exist'); return require(enginePath); }
 const names = n => Array.from({length:n}, (_, i) => '참가자' + i);
-function make(n=6, seed=17, extra={}) { return api().makeGame(names(n), {seed, ...extra}); }
+function make(n=6, seed=17, extra={}) { return api().makeGame(names(n), {seed, flowVersion:1, ...extra}); }
 function role(s, kind) { return s.players.find(p => p.role === kind); }
 function reveal(s) { const E=api(); while(s.phase==='reveal')s=E.act(s,{type:'ROLE_SEEN',actorId:E.turnOwner(s)});return s; }
 function prepare(s, choose=()=>({kind:'pass'})) { const E=api();while(s.phase==='secret'){const actorId=E.turnOwner(s);s=E.act(s,{type:'SECRET_ACTION',actorId,...choose(s.players.find(p=>p.id===actorId),s)});}return s; }
@@ -118,7 +118,7 @@ test('partial original records stay truthful, preserve multiple people including
   for(const record of E.RECORDS){s=prepare(s);s=call(s,'SEARCH',{recordId:record.id});oldFacts.push(s.facts[s.facts.length-1]);assert.ok(truthPresent(s));s=call(s,'ROUND_CONFIRM');}
   const view=E.publicView(s),cs=E.candidates(view),people=new Set(cs.map(c=>c.suspectId));assert.ok(people.size>=3);assert.ok(people.has(S.characterId));
   const privatePeople=new Set(E.candidates(E.privateView(s,s.detectiveId)).map(c=>c.suspectId));assert.ok(privatePeople.size>=2,'five originals plus initial private hints must preserve an interview choice');assert.ok(privatePeople.has(S.characterId),'initial scene memory plus all originals must not automatically clear S');
-  s=prepare(s);s=call(s,'SEARCH',{recordId:E.RECORDS[0].id});assert.deepEqual(s.facts.slice(0,5),oldFacts);assert.equal(s.facts.length,5);
+  s=prepare(s);assert.throws(()=>call(s,'SEARCH',{recordId:E.RECORDS[0].id}),/이미 확보/);assert.deepEqual(s.facts.slice(0,5),oldFacts);assert.equal(s.facts.length,5);
   assert.ok(s.facts.every(f=>f.source==='record'&&f.allowedValues.includes(E.caseValue(s.secretNPC,f.category))));
  }
 });
@@ -164,7 +164,7 @@ test('unknown and blocked questions remain retryable, official facts survive rej
  const facts=s.facts;for(const bad of [{type:'SEARCH',recordId:'__proto__'},{type:'AUDIT',statementId:'missing'},{type:'ANSWER',value:999},{type:'ROUND_CONFIRM',actorId:W.id},{type:'ADD_NOTE',text:{toString:()=>'<script>'}},{type:'ACCUSE',suspectId:'s0'}]){
   assert.throws(()=>E.act(s,{actorId:s.detectiveId,...bad}));assert.deepEqual(s.facts,facts);
  }
- s=call(s,'ROUND_CONFIRM');s=prepare(s);s=call(s,'SEARCH',{recordId:'portrait',value:100,allowedValues:[100],source:'forged'});assert.deepEqual(s.facts,facts);
+ s=call(s,'ROUND_CONFIRM');s=prepare(s);assert.throws(()=>call(s,'SEARCH',{recordId:'portrait',value:100,allowedValues:[100],source:'forged'}),/이미 확보/);assert.deepEqual(s.facts,facts);
 });
 
 function policyRandom(seed) { let x=(seed+1)>>>0;return()=>{x=(Math.imul(1664525,x)+1013904223)>>>0;return x/4294967296;}; }

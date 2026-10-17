@@ -10,18 +10,63 @@ function view(role='suspect',phase='secret',round=1){return{rulesVersion:4,round
 function ui(extra={}){assert.ok(fs.existsSync(filename),'The approved seven-day UI must exist');return require(filename).create({data,...extra});}
 // Reuse the established real-UI DOM harness; only add the two new browser modules.
 // The application itself supplies routing, rendering, privacy and modal lifecycle.
-function integratedClient(presentation){
+function integratedClient(presentation,includeActions=false){
  const vm=require('node:vm'),crypto=require('node:crypto'),{createService,GameError}=require('../lib/game-service.cjs'),{MemoryStore}=require('../lib/store.cjs');
  const source=fs.readFileSync(path.join(__dirname,'online-ui.test.cjs'),'utf8');
  const start=source.indexOf('function makeClient('),end=source.indexOf('async function settle()',start);
  let harness=source.slice(start,end).replace("['catalog.js','detective-options.js','case-interface.js','case-replay.js']","['catalog.js','detective-options.js','case-interface.js','case-replay.js','seven-data.js','seven-app.js']");
+ if(includeActions)harness=harness.replace("'seven-data.js','seven-app.js'","'seven-data.js','seven-actions.js','seven-app.js'");
  harness=harness.replace('if(options.practice){','window.WitnessSevenData=context.WitnessSevenData; if(options.practice){');
  const make=new Function('fs','path','vm','crypto','assert','GameError','publicDir',harness+'; return makeClient;')(fs,path,vm,crypto,assert,GameError,path.join(__dirname,'../public'));
  return make(createService({store:new MemoryStore()}),990,{presentation});
 }
 async function settle(){for(let i=0;i<8;i++)await new Promise(resolve=>setImmediate(resolve));}
+function flowGame(role='witness'){
+ const E=require('../lib/seven-engine.cjs');let state=E.makeGame(['탐정닉','범인닉','증인닉','용의자닉'],{seed:721,roleOrder:['detective','culprit','witness','suspect'],flowVersion:2});
+ while(state.phase==='reveal')state=E.act(state,{type:'ROLE_SEEN',actorId:E.turnOwner(state)});
+ const actorId=state.players.find(p=>p.role===role).id;
+ return {E,actorId,get state(){return state;},view(){return E.privateView(state,actorId);},send(event){state=E.act(state,{...event,actorId});},act(id,event){state=E.act(state,{...event,actorId:id});}};
+}
 function roomProjection(g,revision=1){return{code:'ABC234',caseId:'seven-real-ui',capacity:4,status:'playing',revision,hostId:'u0',meId:g.self.id,members:g.players.map(p=>({id:p.id,gameId:p.id,name:p.name,ready:true,online:true})),game:g};}
 test('notebook tabs show anonymous nickname profiles and card clicks open public detail without toggling exclusions',async()=>{const g=view();let modal='';const U=ui({getGame:()=>g,openModal:(kind,title,body)=>{modal=body;}});const initial=U.render(g,{code:'ABC234',members:g.players});assert.equal((initial.match(/data-seven-person=/g)||[]).length,12);assert.match(initial,/사건기록 수첩/);assert.match(initial,/data-action="seven-board-tab"/);assert.match(initial,/data-action="seven-card-detail"/);assert.match(initial,/&lt;img src=x onerror=1&gt;/);assert.doesNotMatch(initial,/<img src=x|data-character|소유|담당 인물|data-role="culprit"/);for(const [kind,count]of[['place',12],['tool',12],['time',12]]){await U.handle('seven-board-tab',{id:kind});const h=U.render(g);assert.equal((h.match(new RegExp('data-seven-'+kind+'=','g'))||[]).length,count);assert.equal((h.match(/data-seven-person=/g)||[]).length,0);}await U.handle('seven-card-detail',{kind:'person',id:'s1'});assert.match(modal,/인물1/);assert.match(modal,/내 제외 메모 표시/);assert.doesNotMatch(modal,/is-excluded/);assert.match(initial,/7일|7일간|7일의/);});
+test('flow2 prepares any unready participant concurrently and keeps free witness testimony available after readiness',async()=>{
+ const f=flowGame(),D=require('../public/seven-data.js'),A=require('../public/seven-actions.js'),sent=[],fields={'seven-testimony-category':'hand','seven-testimony-value':'1','seven-testimony-text':'왼손 기억을 대조해 주세요.'};
+ const U=ui({data:D,actions:A,getGame:()=>f.view(),read:id=>fields[id]||'',send:async e=>{sent.push(e);f.send(e);}});
+ assert.notEqual(f.E.turnOwner(f.state),f.actorId,'the witness need not be the first unready player');
+ const h=U.personal(f.view(),true);assert.match(h,/동시 비밀 준비/);assert.match(h,/증언을 준비하고 준비 완료/);assert.doesNotMatch(h,/개인행동을 넘기고 다음 차례로/);
+ await U.handle('seven-ready');assert.equal(f.view().self.preparationReady,true);assert.equal(f.view().phase,'secret');assert.deepEqual(sent[0],{type:'SECRET_ACTION',kind:'ready'});
+ await U.handle('seven-offer-testimony');assert.equal(f.view().suggestions[0].kind,'testimony');assert.equal(f.state.phase,'secret');assert.equal(f.state.statements.length,0,'a free offer never certifies truth or spends official investigation');
+ await U.handle('seven-ready');assert.equal(sent.length,2,'stale readiness cannot spend or advance again');
+});
+test('flow2 suspect identity memo is editable outside personal order without charging the daily ability',async()=>{
+ const f=flowGame('suspect'),D=require('../public/seven-data.js'),A=require('../public/seven-actions.js'),fields={'seven-identity-guess':'s0','seven-identity-text':'개인 추정'};
+ const U=ui({data:D,actions:A,getGame:()=>f.view(),read:id=>fields[id]||'',send:async e=>f.send(e)});
+ await U.handle('seven-identity-guess');assert.equal(f.view().self.identityGuess.suspectId,'s0');assert.equal(f.view().self.canPrepare,true);assert.equal(f.view().self.identity.memoryLeft,2);
+ fields['seven-identity-guess']='s1';await U.handle('seven-identity-guess');assert.equal(f.view().self.identityGuess.suspectId,'s1');assert.equal(f.view().preparationReadyIds.length,0);
+});
+test('DAY6 flow2 suspect history closes report after their own readiness even while everyone else remains unready',async()=>{
+ const f=flowGame('suspect'),D=require('../public/seven-data.js'),g=structuredClone(f.view());g.round=6;g.self.preparationReady=true;g.self.canPrepare=false;g.preparationReadyIds=[g.self.id];g.turnIndex=0;const U=ui({data:D,getGame:()=>g});await U.handle('seven-private-pane',{id:'information'});const html=U.personal(g,true);assert.match(html,/봉인 제보 마감 · 이번 사건에는 제보를 남기지 않았습니다/);assert.doesNotMatch(html,/접수 기회가 오늘 한 번/);
+});
+test('real flow2 action notebook replaces the same modal, shows twelve cards and returns to the intact question draft',async()=>{
+ const f=flowGame('detective');for(const p of f.state.players)f.act(p.id,{type:'SECRET_ACTION',kind:'ready'});
+ const g=f.view(),client=integratedClient(undefined,true);client.sessions.set('seven-real-ui:seven-story:1','1');client.api.acceptRoom(roomProjection(g),true);await settle();await client.api.act('seven-private-show',{dataset:{}});await settle();
+ const select=client.document.getElementById('seven-question-category'),target=client.document.getElementById('seven-question-target');assert.ok(select);const chosenCategory=select.value,chosenTarget=target.value;
+ await client.api.act('seven-action-notebook',{dataset:{id:'person'}});await settle();assert.equal(client.api.getModalKind(),'seven-personal');assert.equal(client.document.querySelectorAll('[data-action="seven-action-detail"]').length,12);assert.equal(client.document.getElementById('seven-question-category'),null);
+ await client.api.act('seven-action-detail',{dataset:{kind:'person',id:'s3'}});await settle();assert.match(client.modal(),/한유진/);assert.match(client.modal(),/내 제외 메모 표시/);assert.match(client.modal(),/이 항목이 제외된 근거/);assert.match(client.modal(),/나의.*관찰|본인 정체/);
+ await client.api.act('seven-mark',{dataset:{kind:'person',id:'s3'}});await settle();assert.match(client.modal(),/내 제외 메모 해제/);
+ await client.api.act('seven-action-back',{dataset:{}});await settle();assert.equal(client.document.querySelectorAll('[data-action="seven-action-detail"]').length,12);assert.match(client.modal(),/나의 추정 제외/);
+ await client.api.act('seven-action-back',{dataset:{}});await settle();assert.equal(client.document.getElementById('seven-question-category').value,chosenCategory);assert.equal(client.document.getElementById('seven-question-target').value,chosenTarget);assert.equal(client.requests.length,0,'reading and pencil marks use no server resource');
+});
+test('flow2 detective adopts unverified testimony as a draft and shows prior target question status before confirmation',async()=>{
+ const f=flowGame('detective'),D=require('../public/seven-data.js'),A=require('../public/seven-actions.js');f.act('u2',{type:'OFFER_TESTIMONY',category:'hand',value:1,text:'손의 기억'});for(const p of f.state.players)f.act(p.id,{type:'SECRET_ACTION',kind:'ready'});
+ const g=structuredClone(f.view()),drafts={},sent=[];g.questionHistory.push({round:1,targetId:'u2',category:'hand',proposedValue:0,status:'unknown'});
+ const U=ui({data:D,actions:A,drafts,getGame:()=>g,send:async e=>sent.push(e)});await U.handle('seven-adopt-testimony',{id:g.suggestions[0].id});assert.equal(drafts['seven-question-target'],'u2');assert.equal(drafts['seven-question-category'],'hand');assert.equal(drafts['seven-question-proposed'],'1');assert.equal(sent.length,0);
+ const html=U.personal(g,true);assert.match(html,/이 대상 · 항목의 이전 질문/);assert.match(html,/미진술 · 다시 질문 가능/);assert.match(html,/수사권을 사용하지 않습니다|조사권을 사용하지 않습니다/);
+});
+test('acquired sources open existing records and a stale search is rejected without sending a mutation',async()=>{
+ const f=flowGame('detective'),D=require('../public/seven-data.js'),A=require('../public/seven-actions.js');for(const p of f.state.players)f.act(p.id,{type:'SECRET_ACTION',kind:'ready'});
+ const g=structuredClone(f.view()),source=D.RECORDS[0],sent=[];g.facts.push({id:'already',recordId:source.id,source:'record',category:'gender',allowedValues:[0,1],round:1});const U=ui({data:D,actions:A,getGame:()=>g,send:async e=>sent.push(e)});await U.handle('seven-tab',{id:'search'});const html=U.personal(g,true);assert.match(html,/확보 완료 · 기록 보기/);assert.doesNotMatch(html,new RegExp('data-action="seven-search" data-id="'+source.id+'"'));await U.handle('seven-search',{id:source.id});assert.equal(sent.length,0);
+});
 test('unknown S identity shows three candidates and memory budget without claiming innocence',()=>{const g=view();g.self.identity.characterId='s9';const h=ui().personal(g,true);assert.match(h,/정체 미확인/);assert.match(h,/기억.*2/s);assert.match(h,/seven-memory/);assert.match(h,/면죄부|면죄|인증/);assert.doesNotMatch(h,/확정된 나의 인물|data-known-character|data-photo="s9"[^>]*나의 정체/);const hidden=ui().personal(g,false);assert.doesNotMatch(hidden,/인물1|인물4|인물9|용의자|s9/);});
 test('S report is sealed once by the personal DAY6 turn and cannot be reopened by stale actions',async()=>{let g=view('suspect','secret',6);const sent=[];const U=ui({getGame:()=>g,send:async e=>sent.push(e),read:id=>id==='seven-report-person'?'s4':'의심 이유'});assert.match(U.personal(g,true),/seven-report-submit/);await U.handle('seven-report-submit');assert.deepEqual(sent[0],{type:'SECRET_ACTION',kind:'report',suspectId:'s4',text:'의심 이유'});g.self.sealedReport={suspectId:'s4',text:'봉인 내용',round:6};assert.doesNotMatch(U.personal(g,true),/data-action="seven-report-submit"/);await U.handle('seven-report-submit');assert.equal(sent.length,1);g=view('suspect','secret',7);await U.handle('seven-report-submit');assert.equal(sent.length,1);assert.match(U.personal(g,true),/제보.*마감/s);});
 test('question popup states the current proposed claim, correct answer values and no invented answer truth',()=>{const g=view('culprit','answer',5);g.pending={targetId:'u1',category:'hand',proposedValue:1};g.caseSecret={suspectId:'s0',placeId:'p0',toolId:'t0',timeId:'h0'};g.remainingLies=2;g.remainingRefusals=1;const h=ui().personal(g,true);assert.match(h,/DAY-05/);assert.match(h,/오른손/);assert.match(h,/data-value="0"/);assert.match(h,/data-value="1"/);assert.match(h,/data-value="unknown"/);assert.match(h,/공유.*2/s);});

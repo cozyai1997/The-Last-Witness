@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const E = require('../public/seven-data.js');
+const Actions = require('../public/seven-actions.js');
 
 function assertPairedRoutes(reference) {
   assert.equal(reference.version, 2, 'The public source contract must use paired routes');
@@ -41,7 +42,7 @@ function assertPairedRoutes(reference) {
 async function runSevenFlow(transport, options = {}) {
   for (const catalog of [E.SUSPECTS,E.PLACES,E.TOOLS,E.TIMES]) assert.equal(catalog.length, 12, 'The final release has twelve entries on every board');
   const timings = [], tokens = [], credentials = [], suffix = crypto.randomBytes(3).toString('hex');
-  let latest = null, replayComparisons = 0, privateChecks = 0, reLogins = 0, pairedRouteChecks = 0;
+  let latest = null, replayComparisons = 0, privateChecks = 0, reLogins = 0, pairedRouteChecks = 0, preparationChecks = 0, nonOwnerPreparations = 0, freeEventChecks = 0;
   const request = async (body, expected = 200) => {
     const start = Date.now(), response = await transport(body); timings.push(Date.now() - start);
     assert.equal(response.status, expected, body.op + ': unexpected status (' + (response.data?.code || 'OK') + ')');
@@ -49,6 +50,16 @@ async function runSevenFlow(transport, options = {}) {
     if (data.room) latest = data.room;
     if (data.room?.game) {
       const game = data.room.game; assert.equal(game.rulesVersion, 4); privateChecks++;
+      if (game.flowVersion >= 2) {
+        assert.ok(Array.isArray(game.preparationReadyIds));
+        assert.ok(game.preparationReadyIds.every(id => game.players.some(player => player.id === id)));
+        assert.equal(new Set(game.preparationReadyIds).size, game.preparationReadyIds.length);
+        if (game.phase === 'secret') {
+          assert.equal(game.self.preparationReady, game.preparationReadyIds.includes(game.self.id));
+          assert.equal(game.self.canPrepare, !game.self.preparationReady);
+          preparationChecks++;
+        }
+      }
       for (const key of ['secretNPC','caseWorld','seed','replayEvents','replayVersion','liesUsed','refusalsUsed']) assert.equal(game[key], undefined, 'Private raw state must stay server side: ' + key);
       assert.ok(game.players.every(p => Object.keys(p).sort().join(',') === 'id,isDetective,name'));
       assert.ok(data.room.members.every(m => !Object.hasOwn(m, 'role') && !Object.hasOwn(m, 'characterId')));
@@ -108,11 +119,29 @@ async function runSevenFlow(transport, options = {}) {
       const wrong = (owner() + 1) % 6; await rejectAction(wrong, { type: 'ROLE_SEEN', actorId: latest.game.turnOwnerId }, 403);
     }
     while (latest.game.phase === 'reveal') await ownerAction({ type: 'ROLE_SEEN' });
+    if (scenario.extended && latest.game.flowVersion >= 2) {
+      const W = roles.indexOf('witness'), clue = views[W].game.self.clues[0], before = latest.game;
+      await mutate(W, 'action', { event: { type: 'OFFER_TESTIMONY', category: clue.category, value: clue.value, text: '제가 기억하는 단편을 공식 질문으로 확인해 주세요.', actorId: ids[C] } });
+      assert.equal(latest.game.suggestions.at(-1).speakerId, ids[W]); assert.equal(latest.game.suggestions.at(-1).kind, 'testimony'); freeEventChecks++;
+      await mutate(W, 'action', { event: { type: 'SUGGEST', category: clue.category, text: '이 증언을 다른 원본 기록과 대조해 주세요.' } });
+      assert.equal(latest.game.suggestions.at(-1).kind, 'direction'); freeEventChecks++;
+      await mutate(S, 'action', { event: { type: 'IDENTITY_MEMO', suspectId: views[S].game.self.identity.candidates[0], text: '아직 확정하지 않은 내 정체 가설.' } });
+      assert.ok(latest.game.self.identityGuess); assert.equal(latest.game.self.identity.characterId, undefined); freeEventChecks++;
+      assert.equal(latest.game.phase, before.phase); assert.equal(latest.game.turnOwnerId, before.turnOwnerId);
+      assert.deepEqual(latest.game.preparationReadyIds, before.preparationReadyIds);
+      assert.deepEqual(latest.game.facts, before.facts); assert.deepEqual(latest.game.statements, before.statements);
+      assert.equal((await poll(W)).game.self.identityGuess, undefined);
+    }
     let ownCharacter = null;
     for (let round = 1; round <= 7; round++) {
       assert.equal(latest.game.round, round); let sPassed = false;
       while (latest.game.phase === 'secret') {
-        const i = owner(); let event = { type: 'SECRET_ACTION', kind: 'pass' };
+        const simultaneous = latest.game.flowVersion >= 2;
+        // Reverse seats exercise simultaneous preparation rather than quietly
+        // allowing a sequential-only server to pass the online release test.
+        const i = simultaneous ? ids.findLastIndex(id => !latest.game.preparationReadyIds.includes(id)) : owner();
+        assert.ok(i >= 0);
+        let event = { type: 'SECRET_ACTION', kind: simultaneous ? 'ready' : 'pass' };
         if (i === S && round <= 2) event = { type: 'SECRET_ACTION', kind: 'memory' };
         else if (i === S && round === scenario.reportDay) event = { type: 'SECRET_ACTION', kind: 'report', suspectId: secret.suspectId, text: '기억과 사건 원본의 관찰 경로를 대조한 봉인 제보.' };
         else if (scenario.extended && i === C && round === 1) event = { type: 'SECRET_ACTION', kind: 'seal', category: 'gender' };
@@ -120,23 +149,27 @@ async function runSevenFlow(transport, options = {}) {
         else if (scenario.extended && i === A && round === 3) event = { type: 'SECRET_ACTION', kind: 'seal', category: 'work' };
         if (i === S && scenario.deadline && round === 7) { await rejectAction(S, { type: 'SECRET_ACTION', kind: 'report', suspectId: secret.suspectId, text: '마감 뒤 제보' }); }
         if (i === S && round > scenario.reportDay && scenario.reportDay !== null) await rejectAction(S, { type: 'SECRET_ACTION', kind: 'report', suspectId: secret.suspectId, text: '바꿀 수 없는 두 번째 제보' });
-        const before = latest.revision; room = await ownerAction(event); assert.equal(room.revision, before + 1);
+        if (simultaneous && ids[i] !== latest.game.turnOwnerId) nonOwnerPreparations++;
+        const before = latest.revision; room = await mutate(i, 'action', { event }); assert.equal(room.revision, before + 1);
         if (i === S) {
           sPassed = true; const own = (await poll(S)).game;
           assert.equal(own.self.identity.candidates.length, round === 1 ? 2 : 1);
           if (round === 1) { assert.equal(own.self.identity.known, false); assert.equal(own.self.identity.characterId, undefined); }
           else { ownCharacter = own.self.identity.characterId; assert.equal(own.self.identity.known, true); assert.ok(ownCharacter); }
           if (round === scenario.reportDay) { assert.equal(own.self.sealedReport.suspectId, secret.suspectId); assert.equal(own.self.sealedReport.round, round); assert.equal(own.self.sealedReport.correct, undefined); assert.equal(own.self.sealedReport.isCorrect, undefined); }
-          if (scenario.deadline && round === 6) await rejectAction(S, { type: 'SECRET_ACTION', kind: 'report', suspectId: secret.suspectId, text: '내 개인 턴이 지난 제보' }, 403);
+          if (scenario.deadline && round === 6) await rejectAction(S, { type: 'SECRET_ACTION', kind: 'report', suspectId: secret.suspectId, text: '오늘 준비를 마친 뒤 보낸 제보' }, simultaneous ? 400 : 403);
         }
       }
       assert.equal(sPassed, true); assert.equal(latest.game.phase, 'investigate');
       await rejectAction(D, { type: 'ACCUSE', suspectId: secret.suspectId });
       if (scenario.extended && round <= 4) {
         const target = round === 2 ? A : C;
-        await mutate(D, 'action', { event: { type: 'QUESTION', targetId: ids[target], category: 'tool', proposedValue: 0 } }); assert.equal(latest.game.phase, 'answer');
+        const detective = (await poll(D)).game, choices = Actions.options(detective).questions;
+        const question = choices.find(choice => choice.id === 'tool') || choices.find(choice => ['time','cctv','zone','entry'].includes(choice.id));
+        assert.ok(question, 'The integration policy needs an unresolved official question');
+        await mutate(D, 'action', { event: { type: 'QUESTION', targetId: ids[target], category: question.id, proposedValue: question.proposedValues[0] } }); assert.equal(latest.game.phase, 'answer');
         if (round === 1) await mutate(S, 'action', { event: { type: 'ADD_NOTE', text: '답변 대기 중에도 대화' } });
-        const value = round === 3 ? null : round <= 2 ? (E.caseValue(secret, 'tool') + 1) % E.TOOLS.length : E.caseValue(secret, 'tool');
+        const value = round === 3 ? null : round <= 2 ? (E.caseValue(secret, question.id) + 1) % E.CATEGORIES.find(category => category.id === question.id).values.length : E.caseValue(secret, question.id);
         await mutate(target, 'action', { event: { type: 'ANSWER', value } });
         if (round === 2) { assert.equal((await poll(C)).game.remainingLies, 0); }
         if (round === 3) { assert.equal((await poll(A)).game.remainingRefusals, 0); }
@@ -173,7 +206,7 @@ async function runSevenFlow(transport, options = {}) {
   }
   for (let i = 0; i < 6; i++) { await poll(i); await mutate(i, 'leave'); }
   assert.equal(await poll(0), null);
-  return { passed: true, checkedAt: new Date().toISOString(), rulesVersion: 4, finalInput: 'person-only', catalog: { people: E.SUSPECTS.length, places: E.PLACES.length, tools: E.TOOLS.length, times: E.TIMES.length }, pairedRoutes: true, fieldReferenceVersion: 2, pairedRouteChecks, sessions: 7, simultaneousPlayers: 6, cases: caseResults, requests: timings.length, maxRequestMs: Math.max(...timings), averageRequestMs: Math.round(timings.reduce((a,b) => a+b,0)/timings.length), privateChecks, replayComparisons, reLogins, memory: '3-2-1', sealedReportPrivacy: true, reportOnce: true, day6OwnTurnDeadline: true, earlyAccusationBlocked: true, accountResume: true, oldTokenRevoked: true, actorBoundToSession: true, actualCCharacter: true, dualSuccess: true, selfAccusationPriority: true, neutralNoReport: true, sharedLiesAndRefusal: true, auditVerdictOnly: true, restart: true, credentialsSaved: false };
+  return { passed: true, checkedAt: new Date().toISOString(), rulesVersion: 4, finalInput: 'person-only', catalog: { people: E.SUSPECTS.length, places: E.PLACES.length, tools: E.TOOLS.length, times: E.TIMES.length }, pairedRoutes: true, fieldReferenceVersion: 2, pairedRouteChecks, preparationChecks, nonOwnerPreparations, freeEventChecks, simultaneousPreparation: nonOwnerPreparations > 0, sessions: 7, simultaneousPlayers: 6, cases: caseResults, requests: timings.length, maxRequestMs: Math.max(...timings), averageRequestMs: Math.round(timings.reduce((a,b) => a+b,0)/timings.length), privateChecks, replayComparisons, reLogins, memory: '3-2-1', sealedReportPrivacy: true, reportOnce: true, day6OwnTurnDeadline: true, earlyAccusationBlocked: true, accountResume: true, oldTokenRevoked: true, actorBoundToSession: true, actualCCharacter: true, dualSuccess: true, selfAccusationPriority: true, neutralNoReport: true, sharedLiesAndRefusal: true, auditVerdictOnly: true, restart: true, credentialsSaved: false };
 }
 module.exports = { runSevenFlow, assertPairedRoutes };
 if (require.main === module) {

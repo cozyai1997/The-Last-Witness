@@ -17,26 +17,41 @@
   function chooseComputerEvent(E, view, random = Math.random, memory = { records: [], questions: [] }) {
     const pick = values => values[Math.floor(random() * values.length)];
     const pool = () => optionsFor(E, view);
-    const category = E.CATEGORIES.find(c => knownValue(view, c.id) === null)?.id || E.CATEGORIES[0].id;
+    const A = root.WitnessSevenActions || E.actions, menu = A?.options(view);
+    const publicView = { ...view }; delete publicView.self; delete publicView.caseSecret; delete publicView.seals;
+    const openAbilities = A ? E.CATEGORIES.filter(c => A.abilityAllowed(publicView, c.id)) : E.CATEGORIES.filter(c => knownValue({ ...view, self: { clues: [] } }, c.id) === null);
+    const category = openAbilities[0]?.id || E.CATEGORIES[0].id;
     if (view.phase === 'reveal') return { type: 'ROLE_SEEN' };
     if (view.phase === 'secret') {
+      if (view.flowVersion === 2 && memory.contributionRound !== view.round) {
+        memory.contributionRound = view.round;
+        if (view.self.role !== 'detective') {
+          const observation = view.self.clues.find(clue => !view.questionHistory?.some(q => q.targetId === view.self.id && q.category === clue.category && q.status === 'answered'));
+          if (observation) return { type: 'OFFER_TESTIMONY', category: observation.category, value: observation.value, text: '제 기억을 질문으로 확인해 주세요. 공식 확인 전의 증언 신청입니다.' };
+          if (view.caseSecret) return { type: 'OFFER_TESTIMONY', category, value: E.caseValue(view.caseSecret, category), text: '당시 상황에 관해 진술할 내용이 있습니다. 공식 질문으로 확인해 주세요.' };
+        }
+        return { type: 'SUGGEST', category, text: '아직 확인하지 않은 기록과 진술을 대조해 봅시다.' };
+      }
       if (view.self.role === 'suspect' && view.self.identity.memoryLeft > 0) return { type: 'SECRET_ACTION', kind: 'memory' };
       if (view.self.role === 'suspect' && !view.self.sealedReport && !view.sealedReport && view.round <= 6) {
         const candidates = pool(), candidate = candidates.length ? pick(candidates).suspectId : pick(E.SUSPECTS).id;
         return { type: 'SECRET_ACTION', kind: 'report', suspectId: candidate, text: '공개 수사 기록과 내가 관찰한 자료에 근거한 제보입니다.' };
       }
-      if (view.caseSecret && view.self.sabotageLeft > 0 && !view.seals?.length && view.round <= 5 && random() < .55) return { type: 'SECRET_ACTION', kind: 'seal', category };
-      if (view.self.role === 'suspect' && view.self.guardLeft > 0 && view.round === 5) return { type: 'SECRET_ACTION', kind: 'guard', category };
-      return { type: 'SECRET_ACTION', kind: 'pass' };
+      if (view.caseSecret && view.self.sabotageLeft > 0 && !view.seals?.length && openAbilities.length && view.round <= 5 && random() < .55) return { type: 'SECRET_ACTION', kind: 'seal', category };
+      if (view.self.role === 'suspect' && view.self.guardLeft > 0 && view.round === 5 && openAbilities.length) return { type: 'SECRET_ACTION', kind: 'guard', category };
+      return { type: 'SECRET_ACTION', kind: view.flowVersion === 2 ? 'ready' : 'pass' };
     }
     if (view.phase === 'investigate') {
-      const available = E.RECORDS.filter(r => !memory.records.includes(r.id));
+      const available = E.RECORDS.filter(r => !view.facts.some(f => f.source === 'record' && f.recordId === r.id));
       if (available.length && (view.round % 2 === 0 || view.round === 7)) { const record = pick(available); memory.records.push(record.id); return { type: 'SEARCH', recordId: record.id }; }
-      const categories = E.CATEGORIES.filter(c => knownValue(view, c.id) === null);
+      const offers = (view.suggestions || []).filter(o => o.kind === 'testimony' && o.speakerId !== view.self.id && (A ? A.questionAllowed(view, o.category, o.value) : knownValue(view, o.category) === null) && !view.questionHistory?.some(q => q.targetId === o.speakerId && q.category === o.category && q.status === 'answered'));
+      if (offers.length) { const offer = pick(offers); return { type: 'QUESTION', targetId: offer.speakerId, category: offer.category, proposedValue: offer.value }; }
+      const categories = E.CATEGORIES.filter(c => menu ? menu.questions.some(q => q.id === c.id) : knownValue(view, c.id) === null);
       const pairs = categories.flatMap(c => view.players.filter(p => p.id !== view.self.id).map(p => ({ category: c.id, targetId: p.id }))).filter(q => !memory.questions.includes(q.targetId + ':' + q.category));
-      if (!pairs.length) return { type: 'INVESTIGATE', kind: 'pass' };
+      if (!pairs.length) { if (available.length) return { type: 'SEARCH', recordId: pick(available).id }; return { type: 'INVESTIGATE', kind: 'pass' }; }
       const question = pick(pairs); memory.questions.push(question.targetId + ':' + question.category);
-      return { type: 'QUESTION', ...question, proposedValue: 0 };
+      const proposedValue = menu?.questions.find(q => q.id === question.category)?.proposedValues?.[0] ?? 0;
+      return { type: 'QUESTION', ...question, proposedValue };
     }
     if (view.phase === 'answer') {
       if (!view.caseSecret) return { type: 'ANSWER', value: view.self.answerOptions?.legalValues?.[0] ?? knownValue(view, view.pending.category) };
@@ -73,16 +88,40 @@
     }
     function notify() { const data = response(); try { match?.onChange?.(data); } catch (_) {} return data; }
     function apply(event, owner) {
-      if (event.type !== 'ADD_NOTE' && match.E.turnOwner(match.state) !== owner) throw failure('현재 차례인 참가자만 행동할 수 있습니다.', 'NOT_YOUR_TURN', 403);
+      const free = ['ADD_NOTE','SUGGEST','OFFER_TESTIMONY','IDENTITY_MEMO'].includes(event.type);
+      const preparing = match.state.flowVersion === 2 && match.state.phase === 'secret' && event.type === 'SECRET_ACTION' && !match.state.preparationReadyIds.includes(owner);
+      if (!free && !preparing && match.E.turnOwner(match.state) !== owner) throw failure('현재 차례인 참가자만 행동할 수 있습니다.', 'NOT_YOUR_TURN', 403);
       const clean = {}; for (const key of ['type','kind','category','value','proposedValue','targetId','statementId','recordId','suspectId','placeId','text']) if (Object.prototype.hasOwnProperty.call(event, key)) clean[key] = event[key];
       clean.actorId = owner; clean.speakerId = owner; match.state = match.E.act(match.state, clean); revision++;
     }
+    function nextBotOwner() {
+      if (!match || match.state.phase === 'finished') return null;
+      if (match.state.flowVersion === 2 && match.state.phase === 'secret') return match.state.players.find(p => p.id !== match.humanId && !match.state.preparationReadyIds.includes(p.id))?.id || null;
+      const owner = match.E.turnOwner(match.state); return owner === match.humanId ? null : owner;
+    }
     function schedule() {
-      clearTimer(); if (!match || match.state.phase === 'finished' || match.E.turnOwner(match.state) === match.humanId) return;
+      clearTimer(); if (!nextBotOwner()) return;
       const stamp = generation; timer = root.setTimeout(() => {
         timer = null; if (!match || stamp !== generation) return;
-        const owner = match.E.turnOwner(match.state), view = clone(match.E.privateView(match.state, owner));
-        apply(chooseComputerEvent(match.E, view, match.random, match.memory[owner]), owner); notify(); schedule();
+        const owner = nextBotOwner(); if (!owner) return;
+        if (match.state.flowVersion === 2 && match.state.phase === 'secret') {
+          const owners = match.state.players.filter(p => p.id !== match.humanId && !match.state.preparationReadyIds.includes(p.id)).map(p => p.id);
+          for (const actorId of owners) {
+            if (match.state.phase !== 'secret') break;
+            let view = clone(match.E.privateView(match.state, actorId));
+            let event = chooseComputerEvent(match.E, view, match.random, match.memory[actorId]);
+            apply(event, actorId);
+            if (['SUGGEST', 'OFFER_TESTIMONY', 'IDENTITY_MEMO'].includes(event.type)) {
+              view = clone(match.E.privateView(match.state, actorId));
+              event = chooseComputerEvent(match.E, view, match.random, match.memory[actorId]);
+              apply(event, actorId);
+            }
+          }
+        } else {
+          const view = clone(match.E.privateView(match.state, owner));
+          apply(chooseComputerEvent(match.E, view, match.random, match.memory[owner]), owner);
+        }
+        notify(); schedule();
       }, 700 + Math.floor(match.random() * 701));
     }
     async function start(options = {}) {

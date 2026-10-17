@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),E=require('../lib/seven-engine.cjs');
-function start(){let s=E.makeGame(['가','나','다','라'],{seed:17});while(s.phase==='reveal')s=E.act(s,{type:'ROLE_SEEN',actorId:E.turnOwner(s)});return s;}
+function start(){let s=E.makeGame(['가','나','다','라'],{seed:17,flowVersion:1});while(s.phase==='reveal')s=E.act(s,{type:'ROLE_SEEN',actorId:E.turnOwner(s)});return s;}
 function prepare(s){while(s.phase==='secret')s=E.act(s,{type:'SECRET_ACTION',actorId:E.turnOwner(s),kind:'pass'});return s;}
 test('published investigation suggestions expose only deliberate category requests, while S identity guesses stay private',()=>{
  let s=start();const owner=E.turnOwner(s);

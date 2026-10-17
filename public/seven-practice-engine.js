@@ -1,10 +1,11 @@
 (function (root, factory) {
   'use strict';
   var data = typeof module === 'object' && module.exports ? require('../public/seven-data.js') : root.WitnessSevenData;
-  var api = factory(data);
+  var actions = typeof module === 'object' && module.exports ? require('../public/seven-actions.js') : root.WitnessSevenActions;
+  var api = factory(data, actions);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.WitnessSevenEngine = api;
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (D) {
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (D, Actions) {
   'use strict';
   if (!D) throw new Error('WitnessSevenData가 먼저 필요합니다.');
   var MAX_ROUNDS = 7, LIE_LIMIT = 2;
@@ -51,8 +52,11 @@
   function draw(items, random) { return items[Math.floor(random() * items.length)]; }
   function log(state, type, text) { state.log.push({ round: state.round, type: type, text: text }); }
   function replay(state, type, fields) { state.replayEvents.push(Object.assign({ id: 'replay-' + (state.replayEvents.length + 1), round: state.round, type: type }, copy(fields || {}))); }
+  function simultaneous(state) { return state.flowVersion === 2; }
+  function readyIds(state) { return state.preparationReadyIds || []; }
   function turnOwner(state) {
     if (!state || !Array.isArray(state.players)) fail('유효한 게임 상태가 필요합니다.');
+    if (state.phase === 'secret' && simultaneous(state)) { var unready = state.players.find(function (p) { return !readyIds(state).includes(p.id); }); return unready ? unready.id : state.detectiveId; }
     if (state.phase === 'reveal' || state.phase === 'secret') return state.players[state.turnIndex].id;
     if (state.phase === 'answer') return state.pending.targetId;
     if (['investigate', 'discussion', 'final'].includes(state.phase)) return state.detectiveId;
@@ -149,6 +153,7 @@
   }
   function makeGame(names, options) {
     options = options || {};
+    if (options.flowVersion !== undefined && options.flowVersion !== 1 && options.flowVersion !== 2) fail('유효한 진행 방식을 선택하세요.');
     if (!Array.isArray(names) || names.length < 2 || names.length > 6) fail('참가자는 2명부터 6명까지 가능합니다.');
     names = names.map(function (name) { if (typeof name !== 'string' || !name.trim() || name.trim().length > 20) fail('참가자 이름은 1자부터 20자까지 입력하세요.'); return name.trim(); });
     var seed = options.seed === undefined ? randomSeed() : options.seed;
@@ -206,7 +211,7 @@
       return Object.assign({}, coordinates, { activity: isCulprit ? '사건 발생' : draw(['근무 기록', '이동 기록', '대기 기록'], random) });
     });
     var state = {
-      rulesVersion: 4, maxRounds: MAX_ROUNDS, phase: 'reveal', round: 1, players: players, detectiveId: detective.id, turnIndex: 0,
+      rulesVersion: 4, flowVersion: options.flowVersion === 1 ? 1 : 2, preparationReadyIds: [], maxRounds: MAX_ROUNDS, phase: 'reveal', round: 1, players: players, detectiveId: detective.id, turnIndex: 0,
       kits: 1, liesUsed: 0, refusalsUsed: 0, pending: null, review: null, facts: [], statements: [], notes: [], questionHistory: [], log: [],
       winner: null, accusation: null, secretNPC: secret, fieldReference: reference, caseWorld: { version: 1, crime: copy(secret), events: worldEvents, records: records, fieldReference: copy(reference), resemblance: { suspectId: suspect ? suspect.characterId : null, categories: personCategories.map(function (c) { return c.id; }) } },
       seals: [], guard: null, replayVersion: 2, replayComplete: true, replayEvents: []
@@ -255,6 +260,10 @@
       category = categoryById(event.category);
       var proposed = event.proposedValue === undefined ? 0 : event.proposedValue;
       if (!Number.isInteger(proposed) || category.values[proposed] === undefined) fail('유효한 질문 가설을 선택하세요.');
+      if (simultaneous(state)) {
+        var actorView = privateView(state, event.actorId);
+        if (Actions ? !Actions.questionAllowed(actorView, category.id, proposed) : knowledge(state, playerById(state, event.actorId), category.id).length === 1) fail('이미 확인했거나 제외된 항목입니다. 수사 기록에서 다른 질문을 선택하세요.');
+      }
       replay(next, 'question', { actorId: event.actorId, targetId: target.id, category: category.id, proposedValue: proposed });
       if (blocked(state, category.id)) {
         setReview(next, 'blocked', { category: category.id, targetId: target.id, proposedValue: proposed });
@@ -265,6 +274,7 @@
     }
     if (event.kind === 'search') {
       inCatalog(D.RECORDS, event.recordId, '원본 기록 하나를 선택하세요.');
+      if (state.facts.some(function (entry) { return entry.source === 'record' && entry.recordId === event.recordId; })) fail('이미 확보한 원본입니다. 수사 기록에서 열람하세요.');
       original = state.caseWorld.records.find(function (record) { return record.recordId === event.recordId; });
       category = categoryById(original.category);
       if (blocked(state, category.id)) {
@@ -302,9 +312,34 @@
     if (typeof value !== 'string' || value.length > max || required && !value.trim()) fail('유효한 내용을 입력하세요.');
     return value.trim();
   }
+  function freeContribution(state, next, event) {
+    requirePhase(state, ['secret', 'investigate', 'answer', 'discussion', 'final']);
+    var actor = playerById(next, event.actorId), category, memo;
+    if (event.type === 'IDENTITY_MEMO') {
+      if (actor.role !== 'suspect') fail('정체 메모는 용의자만 사용할 수 있습니다.');
+      personById(event.suspectId); memo = { round: state.round, suspectId: event.suspectId, text: text(event.text, 300, false) };
+      actor.identityGuess = memo; replay(next, 'identity-guess', Object.assign({ actorId: actor.id, kind: 'free' }, memo)); return;
+    }
+    category = categoryById(event.category);
+    var kind = event.type === 'OFFER_TESTIMONY' ? 'testimony' : 'direction';
+    if (kind === 'testimony') {
+      if (actor.id === state.detectiveId) fail('탐정은 공식 수사를 선택하고 다른 참가자의 증언 신청을 검토하세요.');
+      if (!Number.isInteger(event.value) || category.values[event.value] === undefined) fail('유효한 증언 항목을 선택하세요.');
+    }
+    next.suggestions = next.suggestions || [];
+    var previous = next.suggestions.find(function (entry) { return entry.round === state.round && entry.speakerId === actor.id && entry.category === category.id && (entry.kind || 'direction') === kind; });
+    memo = { id: previous ? previous.id : 'suggestion-' + (next.suggestions.length + 1), round: state.round, speakerId: actor.id, category: category.id, kind: kind, text: text(event.text, 300, false) };
+    if (kind === 'testimony') memo.value = event.value;
+    if (previous) next.suggestions[next.suggestions.indexOf(previous)] = memo; else next.suggestions.push(memo);
+    if (kind === 'direction') actor.memo = pick(memo, ['round', 'category', 'text']);
+    replay(next, kind === 'testimony' ? 'testimony-offer' : 'suggest', Object.assign({ actorId: actor.id }, pick(memo, ['round', 'speakerId', 'category', 'kind', 'text', 'value'])));
+  }
   function personal(state, next, event) {
-    requirePhase(state, ['secret']); requireOwner(state, event.actorId);
+    requirePhase(state, ['secret']);
+    if (simultaneous(state)) { playerById(state, event.actorId); if (readyIds(state).includes(event.actorId)) fail('이미 오늘의 비밀 준비를 마쳤습니다.'); }
+    else requireOwner(state, event.actorId);
     var actor = playerById(next, event.actorId), kind = event.kind, category;
+    if (simultaneous(state) && kind === 'suggest') { freeContribution(state, next, Object.assign({}, event, { type: event.suspectId === undefined ? 'SUGGEST' : 'IDENTITY_MEMO' })); return; }
     if (kind === 'memory') {
       if (actor.role !== 'suspect' || actor.identity.memoryLeft < 1) fail('남은 정체 기억 행동이 없습니다.');
       var eliminated = actor.identity.eliminationOrder.shift();
@@ -320,9 +355,11 @@
     } else if (kind === 'seal') {
       if (!isCriminal(actor) || actor.sabotageLeft < 1) fail('남은 봉쇄 행동이 없습니다.'); category = categoryById(event.category);
       if (next.seals.length) fail('한 날의 봉쇄는 범인 진영 전체에서 하나만 선택할 수 있습니다.');
+      if (simultaneous(state) && Actions && !Actions.abilityAllowed(publicView(state), category.id)) fail('공개 기록에서 이미 확인된 항목입니다. 다른 봉쇄 항목을 선택하세요.');
       actor.sabotageLeft -= 1; next.seals.push({ actorId: actor.id, category: category.id }); replay(next, 'seal', { actorId: actor.id, category: category.id });
     } else if (kind === 'guard') {
       if (actor.role !== 'suspect' || actor.guardLeft < 1) fail('남은 보호 행동이 없습니다.'); category = categoryById(event.category);
+      if (simultaneous(state) && Actions && !Actions.abilityAllowed(publicView(state), category.id)) fail('공개 기록에서 이미 확인된 항목입니다. 다른 보호 항목을 선택하세요.');
       actor.guardLeft -= 1; next.guard = { actorId: actor.id, category: category.id }; replay(next, 'guard', { actorId: actor.id, category: category.id });
     } else if (kind === 'suggest') {
       var memo = { round: state.round, text: text(event.text, 300, false) };
@@ -336,10 +373,12 @@
         }
       }
       replay(next, event.suspectId === undefined ? 'suggest' : 'identity-guess', Object.assign({ actorId: actor.id }, memo));
-    } else if (kind === 'pass') replay(next, 'secret-pass', { actorId: actor.id });
+    } else if (kind === 'pass' || kind === 'ready' && simultaneous(state)) replay(next, simultaneous(state) ? 'prepare-ready' : 'secret-pass', { actorId: actor.id });
     else fail('개인 행동을 선택하세요.');
     // The log deliberately cannot disclose action kind, identity progress or report existence.
-    log(next, 'personal', '개인 행동을 마쳤습니다.'); advance(next, 'investigate');
+    log(next, 'personal', simultaneous(state) ? '비밀 준비를 마쳤습니다.' : '개인 행동을 마쳤습니다.');
+    if (simultaneous(state)) { next.preparationReadyIds.push(actor.id); if (next.preparationReadyIds.length === next.players.length) { next.turnIndex = 0; next.phase = 'investigate'; } }
+    else advance(next, 'investigate');
   }
   function act(state, event) {
     if (!state || state.rulesVersion !== 4 || !event || typeof event !== 'object' || Array.isArray(event)) fail('유효한 7일 게임 행동이 필요합니다.');
@@ -349,6 +388,7 @@
       case 'ROLE_SEEN':
         requirePhase(state, ['reveal']); requireOwner(state, event.actorId); advance(next, 'secret'); replay(next, 'role-seen', { actorId: actor.id }); break;
       case 'SECRET_ACTION': personal(state, next, event); break;
+      case 'SUGGEST': case 'OFFER_TESTIMONY': case 'IDENTITY_MEMO': freeContribution(state, next, event); break;
       case 'QUESTION': investigation(state, next, Object.assign({}, event, { kind: 'question' })); break;
       case 'SEARCH': investigation(state, next, Object.assign({}, event, { kind: 'search' })); break;
       case 'AUDIT': investigation(state, next, Object.assign({}, event, { kind: 'audit' })); break;
@@ -376,7 +416,7 @@
         requirePhase(state, ['discussion']); requireDetective(state, event.actorId); replay(next, 'round-confirm', { actorId: actor.id });
         next.pending = null; next.review = null;
         if (state.round === MAX_ROUNDS) { next.phase = 'final'; log(next, 'final', 'DAY 7 수사 검토가 끝났습니다. 진범 인물을 최종 고발하세요.'); }
-        else { next.round += 1; next.turnIndex = 0; next.phase = 'secret'; next.seals = []; next.guard = null; log(next, 'round', 'DAY ' + next.round + ' · 새 수사가 시작되었습니다.'); }
+        else { next.round += 1; next.turnIndex = 0; next.phase = 'secret'; next.preparationReadyIds = []; next.seals = []; next.guard = null; log(next, 'round', 'DAY ' + next.round + ' · 새 수사가 시작되었습니다.'); }
         break;
       case 'ACCUSE':
         requirePhase(state, ['final']); requireDetective(state, event.actorId); if (state.round !== MAX_ROUNDS) fail('DAY 7 최종 검토 이후 고발하세요.');
@@ -403,7 +443,8 @@
   }
   function publicView(state) {
     if (!state || state.rulesVersion !== 4) fail('유효한 7일 게임 상태가 필요합니다.');
-    var view = pick(state, ['rulesVersion', 'maxRounds', 'phase', 'round', 'turnIndex', 'kits', 'detectiveId', 'winner', 'accusation']);
+    var view = pick(state, ['rulesVersion', 'flowVersion', 'maxRounds', 'phase', 'round', 'turnIndex', 'kits', 'detectiveId', 'winner', 'accusation']);
+    if (simultaneous(state)) view.preparationReadyIds = readyIds(state).slice();
     view.players = state.players.map(function (p) { return { id: p.id, name: p.name, isDetective: p.id === state.detectiveId }; });
     view.turnOwnerId = turnOwner(state);
     view.fieldReference = copy(state.fieldReference);
@@ -412,7 +453,7 @@
     view.pending = state.pending ? pick(state.pending, ['targetId', 'category', 'proposedValue']) : null;
     view.review = state.review ? pick(state.review, ['kind', 'round', 'id', 'recordId', 'category', 'allowedValues', 'source', 'targetId', 'statementId', 'value', 'proposedValue', 'verified', 'isTrue']) : null;
     view.questionHistory = state.questionHistory.map(function (entry) { return pick(entry, ['round', 'category', 'targetId', 'recordId', 'proposedValue', 'status']); });
-    view.suggestions = (state.suggestions || []).map(function (entry) { return pick(entry, ['round', 'speakerId', 'category', 'text']); });
+    view.suggestions = (state.suggestions || []).map(function (entry) { return pick(entry, ['id', 'round', 'speakerId', 'category', 'value', 'kind', 'text']); });
     view.notes = state.notes.map(function (entry) { return pick(entry, ['round', 'speakerId', 'text']); });
     view.log = state.log.map(function (entry) { return pick(entry, ['round', 'type', 'text']); });
     if (state.phase === 'finished') {
@@ -428,6 +469,7 @@
   function privateView(state, actorId) {
     var actor = playerById(state, actorId), view = copy(publicView(state));
     view.self = pick(actor, ['id', 'name', 'role', 'clues', 'shared', 'sabotageLeft', 'guardLeft', 'sealOutcome', 'sealOutcomes', 'memo']);
+    if (simultaneous(state)) { view.self.preparationReady = readyIds(state).includes(actorId); view.self.canPrepare = state.phase === 'secret' && !view.self.preparationReady; }
     view.self.identity = pick(actor.identity, ['known', 'candidates', 'memory', 'memoryLeft']);
     if (actor.identity.known) view.self.identity.characterId = actor.characterId;
     if (actor.role === 'suspect') { view.self.sealedReport = actor.sealedReport ? copy(actor.sealedReport) : null; view.self.identityGuess = actor.identityGuess ? copy(actor.identityGuess) : null; }
@@ -438,5 +480,5 @@
     if (state.phase === 'answer' && state.pending.targetId === actor.id) view.self.answerOptions = { category: state.pending.category, legalValues: answerValues(state, actor, state.pending.category) };
     return freeze(view);
   }
-  return freeze(Object.assign({}, D, { makeGame: makeGame, act: act, turnOwner: turnOwner, publicView: publicView, privateView: privateView, caseValue: caseValue }));
+  return freeze(Object.assign({}, D, { makeGame: makeGame, act: act, turnOwner: turnOwner, publicView: publicView, privateView: privateView, caseValue: caseValue, actions: Actions }));
 }));
