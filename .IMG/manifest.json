@@ -1,0 +1,360 @@
+{
+  "schemaVersion": 1,
+  "title": "마지막 목격자 — 이미지 원본",
+  "recordedDate": "2026-10-17",
+  "provenance": {
+    "provider": "OpenAI",
+    "tool": "built-in GPT imagegen",
+    "method": "Generated for this project from text prompts",
+    "promptRecord": "PROMPTS.md"
+  },
+  "preservation": "Original generated PNG files copied byte-for-byte; no cropping, resizing, re-encoding, or color edits.",
+  "assets": [
+    {
+      "file": "crime-scene.png",
+      "sourceFile": "exec-7f692e21-567d-4e48-91e9-4c50d4b39e89.png",
+      "role": "인트로의 기록보관실 사건 현장 배경",
+      "grid": null,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2051198,
+      "sha256": "ed05ae4f8c0b781f44acaea4e21e08a9678e4d695667bc75a0c0cb0b7090cd4a",
+      "originalUnmodified": true
+    },
+    {
+      "file": "suspects-atlas.png",
+      "sourceFile": "exec-45a4fa39-436e-4749-a035-ad3e2869eb27.png",
+      "role": "용의자 8명의 인물 사진",
+      "grid": {
+        "columns": 4,
+        "rows": 2
+      },
+      "format": "PNG",
+      "width": 1774,
+      "height": 887,
+      "bytes": 2360442,
+      "sha256": "cca9c15cad951c3be48a6294e1ba6fa3493d4e4ede3777b3ebc9d801bafe2f64",
+      "originalUnmodified": true
+    },
+    {
+      "file": "locations-atlas.png",
+      "sourceFile": "exec-8526af03-93c6-44ba-8590-c4a257c87651.png",
+      "role": "수사 장소 4개의 장면",
+      "grid": {
+        "columns": 2,
+        "rows": 2
+      },
+      "format": "PNG",
+      "width": 1586,
+      "height": 992,
+      "bytes": 2760989,
+      "sha256": "7ba96f1560a57609e23bc475d0257540ed2e7e0669278e42ebf7987c3a198316",
+      "originalUnmodified": true
+    },
+    {
+      "file": "roles-atlas.png",
+      "sourceFile": "exec-bcec444e-f1ba-4779-a6ca-556351adf7af.png",
+      "role": "2–6명 파티 게임의 탐정·범인·목격자·용의자·공범·봉인 사건 역할 카드",
+      "grid": {
+        "columns": 3,
+        "rows": 2
+      },
+      "format": "PNG",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 2232453,
+      "sha256": "d02f02fd380ab7694586c0f7a728536f162db0bd3a9475c16a29a4064fcf133a",
+      "sourceSha256": "d02f02fd380ab7694586c0f7a728536f162db0bd3a9475c16a29a4064fcf133a",
+      "originalUnmodified": true
+    },
+    {
+      "file": "discussion-room.png",
+      "sourceFile": "exec-2ca01b93-d3ae-438d-81e3-060c9378124a.png",
+      "role": "공개 토론과 공동 수사 화면의 기록보관실 토론 테이블",
+      "grid": null,
+      "format": "PNG",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2170766,
+      "sha256": "4eb51a599880eab7e59522f83bc414f868dbc44711cd63c5b8bb06fc285154a3",
+      "sourceSha256": "4eb51a599880eab7e59522f83bc414f868dbc44711cd63c5b8bb06fc285154a3",
+      "originalUnmodified": true
+    }
+  ],
+  "mapping": {
+    "hero": {
+      "asset": "crime-scene.png",
+      "selector": ".hero::before",
+      "deliveryAsset": "crime-scene.webp"
+    },
+    "suspects": [
+      {
+        "id": "s0",
+        "name": "서도윤",
+        "asset": "suspects-atlas.png",
+        "column": 0,
+        "row": 0,
+        "cssPosition": "0.000000% 0%",
+        "deliveryAsset": "suspects-atlas.webp"
+      },
+      {
+        "id": "s1",
+        "name": "윤서하",
+        "asset": "suspects-atlas.png",
+        "column": 1,
+        "row": 0,
+        "cssPosition": "33.333333% 0%",
+        "deliveryAsset": "suspects-atlas.webp"
+      },
+      {
+        "id": "s2",
+        "name": "강시온",
+        "asset": "suspects-atlas.png",
+        "column": 2,
+        "row": 0,
+        "cssPosition": "66.666667% 0%",
+        "deliveryAsset": "suspects-atlas.webp"
+      },
+      {
+        "id": "s3",
+        "name": "한유진",
+        "asset": "suspects-atlas.png",
+        "column": 3,
+        "row": 0,
+        "cssPosition": "100.000000% 0%",
+        "deliveryAsset": "suspects-atlas.webp"
+      },
+      {
+        "id": "s4",
+        "name": "이태오",
+        "asset": "suspects-atlas.png",
+        "column": 0,
+        "row": 1,
+        "cssPosition": "0.000000% 100%",
+        "deliveryAsset": "suspects-atlas.webp"
+      },
+      {
+        "id": "s5",
+        "name": "정하린",
+        "asset": "suspects-atlas.png",
+        "column": 1,
+        "row": 1,
+        "cssPosition": "33.333333% 100%",
+        "deliveryAsset": "suspects-atlas.webp"
+      },
+      {
+        "id": "s6",
+        "name": "백지후",
+        "asset": "suspects-atlas.png",
+        "column": 2,
+        "row": 1,
+        "cssPosition": "66.666667% 100%",
+        "deliveryAsset": "suspects-atlas.webp"
+      },
+      {
+        "id": "s7",
+        "name": "차수아",
+        "asset": "suspects-atlas.png",
+        "column": 3,
+        "row": 1,
+        "cssPosition": "100.000000% 100%",
+        "deliveryAsset": "suspects-atlas.webp"
+      }
+    ],
+    "places": [
+      {
+        "id": "p0",
+        "name": "기록보관실",
+        "asset": "locations-atlas.png",
+        "column": 0,
+        "row": 0,
+        "cssPosition": "0% 0%",
+        "deliveryAsset": "locations-atlas.webp"
+      },
+      {
+        "id": "p1",
+        "name": "지하 기계실",
+        "asset": "locations-atlas.png",
+        "column": 1,
+        "row": 0,
+        "cssPosition": "100% 0%",
+        "deliveryAsset": "locations-atlas.webp"
+      },
+      {
+        "id": "p2",
+        "name": "중앙 정원",
+        "asset": "locations-atlas.png",
+        "column": 0,
+        "row": 1,
+        "cssPosition": "0% 100%",
+        "deliveryAsset": "locations-atlas.webp"
+      },
+      {
+        "id": "p3",
+        "name": "뒷골목",
+        "asset": "locations-atlas.png",
+        "column": 1,
+        "row": 1,
+        "cssPosition": "100% 100%",
+        "deliveryAsset": "locations-atlas.webp"
+      }
+    ],
+    "dossierPortrait": {
+      "id": "s4",
+      "selector": ".art-portrait [data-photo=\"s4\"]"
+    },
+    "roles": [
+      {
+        "id": "detective",
+        "asset": "roles-atlas.png",
+        "deliveryAsset": "roles-atlas.webp",
+        "column": 0,
+        "row": 0,
+        "cssPosition": "0% 0%",
+        "selector": ".role-art[data-role=\"detective\"]"
+      },
+      {
+        "id": "culprit",
+        "asset": "roles-atlas.png",
+        "deliveryAsset": "roles-atlas.webp",
+        "column": 1,
+        "row": 0,
+        "cssPosition": "50% 0%",
+        "selector": ".role-art[data-role=\"culprit\"]"
+      },
+      {
+        "id": "witness",
+        "asset": "roles-atlas.png",
+        "deliveryAsset": "roles-atlas.webp",
+        "column": 2,
+        "row": 0,
+        "cssPosition": "100% 0%",
+        "selector": ".role-art[data-role=\"witness\"]"
+      },
+      {
+        "id": "suspect",
+        "asset": "roles-atlas.png",
+        "deliveryAsset": "roles-atlas.webp",
+        "column": 0,
+        "row": 1,
+        "cssPosition": "0% 100%",
+        "selector": ".role-art[data-role=\"suspect\"]"
+      },
+      {
+        "id": "accomplice",
+        "asset": "roles-atlas.png",
+        "deliveryAsset": "roles-atlas.webp",
+        "column": 1,
+        "row": 1,
+        "cssPosition": "50% 100%",
+        "selector": ".role-art[data-role=\"accomplice\"]"
+      },
+      {
+        "id": "sealed",
+        "asset": "roles-atlas.png",
+        "deliveryAsset": "roles-atlas.webp",
+        "column": 2,
+        "row": 1,
+        "cssPosition": "100% 100%",
+        "selector": ".role-art[data-role=\"sealed\"]"
+      }
+    ],
+    "discussion": {
+      "asset": "discussion-room.png",
+      "deliveryAsset": "discussion-room.webp",
+      "selector": ".discussion-scene"
+    }
+  },
+  "sourceStylesheet": "assets.css (included with the editable source package)",
+  "standalone": "The build embeds image bytes as data URLs; final standalone HTML does not require a network or sibling image files.",
+  "derivatives": [
+    {
+      "file": "crime-scene.webp",
+      "format": "WebP",
+      "width": 1672,
+      "height": 941,
+      "bytes": 179996,
+      "sha256": "03e5f85c30968ddac28874104cfb53bc6ecaf8ce0397827e497805689efa5c96",
+      "sourceOriginal": "crime-scene.png",
+      "sourceOriginalSha256": "ed05ae4f8c0b781f44acaea4e21e08a9678e4d695667bc75a0c0cb0b7090cd4a",
+      "encoding": {
+        "quality": 88,
+        "effort": 6,
+        "resize": false,
+        "crop": false
+      },
+      "role": "Browser delivery derivative; full original dimensions and composition"
+    },
+    {
+      "file": "suspects-atlas.webp",
+      "format": "WebP",
+      "width": 1774,
+      "height": 887,
+      "bytes": 159490,
+      "sha256": "2a4a6e00306f9667cdf4e08bfdf235bece7efd8b1d39fdfd3316038ede17459b",
+      "sourceOriginal": "suspects-atlas.png",
+      "sourceOriginalSha256": "cca9c15cad951c3be48a6294e1ba6fa3493d4e4ede3777b3ebc9d801bafe2f64",
+      "encoding": {
+        "quality": 88,
+        "effort": 6,
+        "resize": false,
+        "crop": false
+      },
+      "role": "Browser delivery derivative; full original dimensions and composition"
+    },
+    {
+      "file": "locations-atlas.webp",
+      "format": "WebP",
+      "width": 1586,
+      "height": 992,
+      "bytes": 400812,
+      "sha256": "680e87d147f6c91b5121b3c7ff3ad9ac13aa3ca9551811983e2de33aa8a6aaf2",
+      "sourceOriginal": "locations-atlas.png",
+      "sourceOriginalSha256": "7ba96f1560a57609e23bc475d0257540ed2e7e0669278e42ebf7987c3a198316",
+      "encoding": {
+        "quality": 88,
+        "effort": 6,
+        "resize": false,
+        "crop": false
+      },
+      "role": "Browser delivery derivative; full original dimensions and composition"
+    },
+    {
+      "file": "roles-atlas.webp",
+      "format": "WebP",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 183644,
+      "sha256": "851b54ec0edec55e3aedba564eb468e514570676a72956930d179cacb1eaad42",
+      "sourceOriginal": "roles-atlas.png",
+      "sourceOriginalSha256": "d02f02fd380ab7694586c0f7a728536f162db0bd3a9475c16a29a4064fcf133a",
+      "encoding": {
+        "quality": 88,
+        "effort": 6,
+        "resize": false,
+        "crop": false
+      },
+      "role": "Browser delivery derivative; full original dimensions and composition"
+    },
+    {
+      "file": "discussion-room.webp",
+      "format": "WebP",
+      "width": 1672,
+      "height": 941,
+      "bytes": 222912,
+      "sha256": "7f5fd4ca98cfa4f1d3c97cc89922dd3221b310d24cf387748b0545b5a9d4d2ae",
+      "sourceOriginal": "discussion-room.png",
+      "sourceOriginalSha256": "4eb51a599880eab7e59522f83bc414f868dbc44711cd63c5b8bb06fc285154a3",
+      "encoding": {
+        "quality": 88,
+        "effort": 6,
+        "resize": false,
+        "crop": false
+      },
+      "role": "Browser delivery derivative; full original dimensions and composition"
+    }
+  ],
+  "deliveryFormat": "WebP quality 88 at original dimensions; original PNG masters are retained unchanged.",
+  "additionalSourceStylesheet": "party-assets.css (included with the multiplayer editable source package)"
+}

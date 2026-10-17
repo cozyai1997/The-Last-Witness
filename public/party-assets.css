@@ -1,0 +1,38 @@
+/* Generated image masters and provenance are preserved in .IMG/manifest.json. */
+.role-art {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 1px solid rgba(213, 180, 126, 0.24);
+  border-radius: 18px;
+  background-color: #161410;
+  background-image: url("images/roles-atlas.webp");
+  background-repeat: no-repeat;
+  background-size: 300% 200%;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+}
+
+.role-art[data-role="detective"] { background-position: 0% 0%; }
+.role-art[data-role="culprit"] { background-position: 50% 0%; }
+.role-art[data-role="witness"] { background-position: 100% 0%; }
+.role-art[data-role="suspect"] { background-position: 0% 100%; }
+.role-art[data-role="accomplice"] { background-position: 50% 100%; }
+.role-art[data-role="sealed"] { background-position: 100% 100%; }
+
+.discussion-scene {
+  background-color: #111210;
+  background-image: linear-gradient(90deg, rgba(6, 9, 9, 0.88) 0%, rgba(6, 9, 9, 0.77) 50%, rgba(6, 9, 9, 0.68) 100%), url("images/discussion-room.webp");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  color: #f4efe6;
+}
+
+.party-intro {
+  background-color: #111210;
+  background-image: linear-gradient(90deg, rgba(7, 10, 11, 0.9) 0%, rgba(7, 10, 11, 0.74) 54%, rgba(7, 10, 11, 0.45) 100%), url("images/crime-scene.webp");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}

@@ -1,0 +1,140 @@
+/* 마지막 목격자 — GPT-generated original image mappings.
+ * These WebP delivery paths are embedded as direct data URLs by the standalone build.
+ * The unmodified PNG masters live in the delivered .IMG folder.
+ */
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: -32px -42px 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, rgba(9,11,12,.93) 0%, rgba(9,11,12,.76) 30%, rgba(9,11,12,.34) 57%, rgba(9,11,12,.09) 100%),
+    linear-gradient(0deg, #0b0c0e 0%, rgba(11,12,14,.10) 37%, rgba(11,12,14,.02) 80%),
+    url("images/crime-scene.webp");
+  background-size: cover;
+  background-position: center, center, 55% 52%;
+  opacity: .94;
+  filter: saturate(.82);
+}
+
+.hero-copy { z-index: 2; }
+.intro-art { z-index: 1; }
+.hero-description { color: #c3c0b6; text-shadow: 0 2px 12px #000; }
+.hero .eyebrow { text-shadow: 0 2px 12px #000; }
+
+/* A 4-column, 2-row atlas. Each tile is square in the untouched master. */
+.portrait[data-sprite],
+.photo-sprite[data-photo] {
+  background-image: url("images/suspects-atlas.webp");
+  background-repeat: no-repeat;
+  background-size: 400% 200%;
+  background-position: var(--photo-x, 0%) var(--photo-y, 0%);
+}
+
+.photo-sprite {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+/* Center-crop square cells in the existing compact card frames. */
+.portrait .photo-sprite {
+  inset: 50% 0 auto;
+  width: 100%;
+  height: auto;
+  min-height: 100%;
+  aspect-ratio: 1;
+  transform: translateY(-50%);
+  filter: saturate(.76) contrast(1.04);
+}
+
+.portrait[data-sprite] > svg,
+.portrait[data-sprite] > .portrait-fallback { display: none; }
+.portrait .portrait-id {
+  z-index: 2;
+  color: #ece2c9;
+  text-shadow: 0 1px 5px #000;
+  padding: 3px 4px;
+  background: #090b0b73;
+  border-left: 1px solid #c9a97980;
+}
+
+.art-portrait .photo-sprite {
+  inset: 0;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  aspect-ratio: auto;
+  transform: none;
+  filter: sepia(.13) contrast(1.04);
+}
+
+.art-portrait:has(> .photo-sprite) > svg { display: none; }
+.art-portrait .art-bar { z-index: 2; }
+
+[data-photo="s0"], .portrait[data-sprite="s0"] { --photo-x: 0%; --photo-y: 0%; }
+[data-photo="s1"], .portrait[data-sprite="s1"] { --photo-x: 33.333333%; --photo-y: 0%; }
+[data-photo="s2"], .portrait[data-sprite="s2"] { --photo-x: 66.666667%; --photo-y: 0%; }
+[data-photo="s3"], .portrait[data-sprite="s3"] { --photo-x: 100%; --photo-y: 0%; }
+[data-photo="s4"], .portrait[data-sprite="s4"] { --photo-x: 0%; --photo-y: 100%; }
+[data-photo="s5"], .portrait[data-sprite="s5"] { --photo-x: 33.333333%; --photo-y: 100%; }
+[data-photo="s6"], .portrait[data-sprite="s6"] { --photo-x: 66.666667%; --photo-y: 100%; }
+[data-photo="s7"], .portrait[data-sprite="s7"] { --photo-x: 100%; --photo-y: 100%; }
+
+/* The place atlas is 2 columns by 2 rows. */
+.place[data-place] { isolation: isolate; background: #151716; }
+.place[data-place]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-image: url("images/locations-atlas.webp");
+  background-size: 200% 200%;
+  background-position: var(--place-x, 0%) var(--place-y, 0%);
+  background-repeat: no-repeat;
+  opacity: .91;
+  filter: saturate(.78) contrast(1.04);
+  transition: filter .25s ease, opacity .25s ease;
+}
+.place[data-place]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(180deg, #07090a26 0%, #07090a52 33%, #07090ae8 100%);
+  box-shadow: inset 0 0 24px #0004;
+}
+.place[data-place]:hover:not(:disabled)::before { opacity: 1; filter: saturate(.94) contrast(1.05); }
+.place[data-place].selected::after {
+  background: linear-gradient(180deg, #4c15170d 0%, #180b0b65 40%, #12090bef 100%);
+  box-shadow: inset 0 0 0 1px #cb5145, inset 0 0 26px #5d161539;
+}
+.place[data-place] > :not(.place-icon) { position: relative; z-index: 1; }
+.place[data-place] .place-icon { display: none; }
+.place[data-place] .place-id { color: #e3bc78; text-shadow: 0 1px 8px #000; }
+.place[data-place] strong { color: #f1e6ce; text-shadow: 0 2px 7px #000; }
+.place[data-place] small { color: #d1cbbd; text-shadow: 0 1px 7px #000; }
+.place[data-place="p0"] { --place-x: 0%; --place-y: 0%; }
+.place[data-place="p1"] { --place-x: 100%; --place-y: 0%; }
+.place[data-place="p2"] { --place-x: 0%; --place-y: 100%; }
+.place[data-place="p3"] { --place-x: 100%; --place-y: 100%; }
+
+@media (max-width: 580px) {
+  .hero::before {
+    inset: -20px -16px 0;
+    background-image:
+      linear-gradient(180deg, rgba(9,11,12,.75) 0%, rgba(9,11,12,.64) 35%, rgba(9,11,12,.15) 63%, rgba(9,11,12,.3) 100%),
+      linear-gradient(0deg, #0b0c0e 0%, transparent 27%, rgba(11,12,14,.15) 100%),
+      url("images/crime-scene.webp");
+    background-position: center, center, 65% center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .place[data-place]::before { transition: none; }
+}

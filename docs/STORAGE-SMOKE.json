@@ -1,0 +1,7 @@
+{
+  "wrongSecretStatus": 401,
+  "missingSecretStatus": 401,
+  "CASOneWinnerOfSix": true,
+  "directTableStatus": 404,
+  "privateSchemaStatus": 406
+}

@@ -1,0 +1,119 @@
+{
+  "generatedAt": "2026-10-17T06:23:31.478Z",
+  "status": "PASS",
+  "scope": "Independent in-process service review with fresh MemoryStore fixtures; no live credentials, HTTP deployment, SQL execution or browser automation",
+  "checks": [
+    {
+      "id": "S01",
+      "name": "Predictable login ID cannot recover another guest",
+      "result": "PASS"
+    },
+    {
+      "id": "S14",
+      "name": "Missing and forged bearer tokens are rejected",
+      "result": "PASS"
+    },
+    {
+      "id": "S15",
+      "name": "Non-host cannot kick the host or claim another management identity",
+      "result": "PASS"
+    },
+    {
+      "id": "S02-2",
+      "name": "2-player exact role pack/resources, two distinct initial clues, own-card projection",
+      "result": "PASS"
+    },
+    {
+      "id": "S02-3",
+      "name": "3-player exact role pack/resources, two distinct initial clues, own-card projection",
+      "result": "PASS"
+    },
+    {
+      "id": "S02-4",
+      "name": "4-player exact role pack/resources, two distinct initial clues, own-card projection",
+      "result": "PASS"
+    },
+    {
+      "id": "S02-5",
+      "name": "5-player exact role pack/resources, two distinct initial clues, own-card projection",
+      "result": "PASS"
+    },
+    {
+      "id": "S02-6",
+      "name": "6-player exact role pack/resources, two distinct initial clues, own-card projection",
+      "result": "PASS"
+    },
+    {
+      "id": "S03",
+      "name": "Authenticated outsider cannot acquire or act in another room",
+      "result": "PASS"
+    },
+    {
+      "id": "S04",
+      "name": "Private seal/guard stay private; blocked search preserves shared kit",
+      "result": "PASS"
+    },
+    {
+      "id": "S05",
+      "name": "Forged note author is replaced with authenticated seat",
+      "result": "PASS"
+    },
+    {
+      "id": "S06",
+      "name": "Private answer phase restricts actor; spent lie budget remains criminal-only",
+      "result": "PASS"
+    },
+    {
+      "id": "S07",
+      "name": "Audit preserves original signed claim and appends true fact",
+      "result": "PASS"
+    },
+    {
+      "id": "S08",
+      "name": "Spent kit cannot be reused; result reveals all roles only after completion",
+      "result": "PASS"
+    },
+    {
+      "id": "S10",
+      "name": "Honest role cannot guess an unknown coordinate; unknown creates no claim",
+      "result": "PASS"
+    },
+    {
+      "id": "S11",
+      "name": "Matching one-use guard cancels a seal and permits true official search",
+      "result": "PASS"
+    },
+    {
+      "id": "S12",
+      "name": "Guard cannot refill; second same-round seal is rejected without spending charge",
+      "result": "PASS"
+    },
+    {
+      "id": "S13",
+      "name": "C and A share two lies; third false answer and sixth round rejected",
+      "result": "PASS"
+    },
+    {
+      "id": "S09",
+      "name": "Polling just before absolute TTL does not extend session",
+      "result": "PASS",
+      "clock": "Injected clock, not a real 24-hour wait"
+    }
+  ],
+  "checksPassed": 19,
+  "phaseSnapshotSetsChecked": 18,
+  "projectionsPerSnapshot": 6,
+  "resolvedFinding": {
+    "severity": "P1",
+    "issue": "Predictable public nickname + login requestId previously recovered the same guest bearer token",
+    "before": "Reproduced from another fixture IP: same bearer, existing room, same member",
+    "after": "Fresh independent token and no inherited room; regression passes"
+  },
+  "outsideThisHarness": [
+    "Production Supabase RPC access controls (separately checked by deployment owner)",
+    "Real 24-hour passage and scheduled physical deletion",
+    "Live multiple server instances under load",
+    "Browser/XSS rendering, refresh and private-panel removal",
+    "Human multiplayer win rates or social balance"
+  ]
+}
