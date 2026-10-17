@@ -1,0 +1,49 @@
+/* Complete Nanum Pen Script, Sandoll / NHN, SIL OFL 1.1; WOFF2 compression only.
+   Source: https://github.com/google/fonts/tree/main/ofl/nanumpenscript
+   The copyright notice and complete license accompany fonts/OFL.txt. */
+@font-face{font-family:WitnessHandwriting;src:url('/fonts/handwriting.woff2') format('woff2');font-style:normal;font-weight:400;font-display:swap}
+#cw-presentation-root{position:fixed;inset:0;z-index:80;pointer-events:none;isolation:isolate;color:#e9e0cf}
+body.cw-story-open{overflow:hidden}
+.cw-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto;pointer-events:auto;background:rgba(3,6,8,.91);backdrop-filter:blur(7px);animation:cw-scene-enter .35s ease both}
+.cw-overlay *,.cw-day-banner *{box-sizing:border-box}
+.cw-scene{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(3,6,8,.8),rgba(3,6,8,.91)),url('/images/crime-scene.webp') center/cover;opacity:.4;pointer-events:none}
+.cw-story{position:relative;width:min(800px,100%);max-height:calc(100dvh - 48px);overflow:auto;border:1px solid rgba(191,156,101,.4);background:#101315;box-shadow:0 28px 100px #000b;outline:none}
+.cw-story:focus-visible{outline:1px solid #c5ae81;outline-offset:4px}
+.cw-story-top{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 24px;border-bottom:1px solid #bca77d30}
+.cw-case-label{font:10px/1.4 Consolas,monospace;letter-spacing:.18em;color:#b3a18a}
+.cw-story-day{font:600 22px/1 Georgia,serif;color:#ca4e45;letter-spacing:.12em;white-space:nowrap}
+.cw-paper{position:relative;margin:24px;padding:28px 36px 32px;color:#28231c;background:radial-gradient(ellipse at 12% 15%,#f0e5ca5c,transparent 55%),linear-gradient(105deg,#b9a98b,#e0d4b7 42%,#cbbd9b);box-shadow:inset 0 0 38px #725d3233,0 10px 36px #0006}
+.cw-paper::before{position:absolute;content:'';inset:10px;border:1px solid #6c583d30;pointer-events:none}
+.cw-paper-meta{display:flex;justify-content:space-between;gap:15px;color:#6e5540;font:10px/1.5 Consolas,monospace;letter-spacing:.12em;margin-bottom:17px}
+.cw-story-title{font:600 clamp(21px,3vw,28px)/1.5 Batang,serif;letter-spacing:-.025em;margin:0 0 20px;color:#382a20}
+.cw-handwriting{font-family:WitnessHandwriting,'Nanum Pen Script',Batang,cursive;font-weight:400;word-break:keep-all;overflow-wrap:anywhere;letter-spacing:.015em}
+.cw-story-text{position:relative;min-height:5.1em;margin:0;font-size:clamp(28px,4.8vw,39px);line-height:1.5;white-space:pre-wrap;color:#34291f;text-shadow:0 .3px .4px #3b271b30}
+.cw-typing::after{content:'│';display:inline-block;margin-left:2px;font-family:serif;font-size:.7em;color:#a43b32;opacity:.8;animation:cw-pen-breathe 1.5s ease-in-out infinite}
+.cw-stamp{display:block;text-align:right;transform:rotate(-7deg);margin-top:22px;color:#92382e;font:600 12px/1.4 Georgia,serif;letter-spacing:.2em;opacity:.74}
+.cw-story-footer{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:0 24px 22px}
+.cw-story-hint{font:11px/1.7 'Malgun Gothic',sans-serif;color:#8f938b;margin:0}
+.cw-story-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.cw-button{appearance:none;border:1px solid #655d4e;background:#1c211f;color:#e4d6bc;font:12px/1.4 'Malgun Gothic',sans-serif;padding:10px 14px;min-height:42px;cursor:pointer;white-space:nowrap;border-radius:0;transition:background .16s,border-color .16s}
+.cw-button:hover{background:#33352b;border-color:#bda373}
+.cw-button:focus-visible{outline:2px solid #dec795;outline-offset:3px}
+.cw-button:disabled{opacity:.45;cursor:default}
+.cw-button-primary{background:#9e352f;border-color:#b0493d;color:#fff0d9}
+.cw-button-primary:hover{background:#b44539;border-color:#d66a50}
+.cw-button-quiet{background:transparent;border-color:transparent;color:#aaa493}
+.cw-button-quiet:hover{background:#ffffff08;border-color:#70634c}
+.cw-day-banner{position:absolute;top:max(20px,env(safe-area-inset-top));left:50%;width:min(840px,calc(100% - 32px));transform:translateX(-50%);pointer-events:none;overflow:hidden;border-top:1px solid #a6453d;border-bottom:1px solid #79352e;background:linear-gradient(90deg,#350f11ee,#6b1e20f2 45%,#2c0c10ee);box-shadow:0 15px 55px #0008;animation:cw-day-enter .42s ease-out both}
+.cw-day-banner::after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,transparent,#c15143,transparent);opacity:.6}
+.cw-day-inner{display:flex;align-items:center;justify-content:space-between;gap:22px;padding:14px 30px}
+.cw-day-number{position:relative;flex:none;max-width:100%;white-space:nowrap;font:600 clamp(39px,7vw,72px)/1 Georgia,serif;letter-spacing:.12em;color:#bd332d;background:linear-gradient(180deg,#f28a68 0%,#bf352b 34%,#7b121b 72%,#d44232 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;text-shadow:0 1px 0 #7f171830,0 3px 5px #080002b3,0 0 14px #aa211c30;filter:drop-shadow(0 1px 0 #e9664a33)}
+.cw-day-number::after{content:'';position:absolute;inset:calc(100% - 3px) 0 auto;height:12px;pointer-events:none;background:linear-gradient(#7c1720,#a52b27) 19% 0/3px 10px no-repeat,linear-gradient(#981f22,#6d101b) 54% 0/2px 7px no-repeat,linear-gradient(#80131c,#a52c28) 83% 0/3px 12px no-repeat;border-radius:0 0 50% 50%;opacity:.85}
+.gore-off .cw-day-number::after{display:none}
+.cw-day-caption{font:12px/1.6 'Malgun Gothic',sans-serif;letter-spacing:.12em;color:#c49c8b;text-align:right}
+.cw-day-leave{animation:cw-day-exit .24s ease-in forwards}
+@keyframes cw-scene-enter{from{opacity:0}to{opacity:1}}
+@keyframes cw-day-enter{from{opacity:0;transform:translate(-50%,-15px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes cw-day-exit{to{opacity:0;transform:translate(-50%,-10px)}}
+@keyframes cw-pen-breathe{50%{opacity:.25}}
+@media(max-width:600px){.cw-overlay{padding:12px;align-items:center}.cw-story{max-height:calc(100dvh - 24px)}.cw-story-top{padding:14px 16px;gap:8px}.cw-case-label{font-size:8px;letter-spacing:.08em}.cw-story-day{font-size:19px}.cw-paper{margin:15px;padding:25px 23px}.cw-paper-meta{font-size:8px;margin-bottom:14px}.cw-story-title{font-size:21px;margin-bottom:14px}.cw-story-text{font-size:30px;line-height:1.46;min-height:6em}.cw-story-footer{padding:0 15px 17px;align-items:stretch;flex-direction:column;gap:10px}.cw-story-hint{font-size:10px}.cw-story-actions{width:100%;justify-content:flex-end;gap:5px}.cw-button{min-height:42px;font-size:11px;padding:9px 11px}.cw-button-primary{flex:1}.cw-day-inner{padding:13px 20px 21px;gap:12px}.cw-day-number{font-size:clamp(30px,7.2vw,42px);letter-spacing:.08em}.cw-day-caption{min-width:0;font-size:10px;letter-spacing:.04em;overflow-wrap:anywhere}.cw-day-number::after{height:9px;background-size:2px 7px,2px 5px,2px 9px}}
+@media(max-height:560px){.cw-overlay{align-items:flex-start}.cw-story-text{min-height:3em}.cw-paper{margin:14px;padding-top:19px;padding-bottom:20px}.cw-stamp{margin-top:10px}}
+@media(prefers-reduced-motion:reduce){#cw-presentation-root *,#cw-presentation-root *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}.cw-typing::after{animation:none;opacity:.5}}
+@media print{#cw-presentation-root{display:none!important}}

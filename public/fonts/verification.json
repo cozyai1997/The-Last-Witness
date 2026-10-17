@@ -1,0 +1,49 @@
+{
+  "source": "https://raw.githubusercontent.com/google/fonts/main/ofl/nanumpenscript/NanumPenScript-Regular.ttf",
+  "tools": {
+    "fonttools": "4.67.0",
+    "brotli": "1.2.0"
+  },
+  "sourceBytes": 3201664,
+  "woff2Bytes": 749972,
+  "savedBytes": 2451692,
+  "savedPercent": 76.58,
+  "sourceSha256": "6f0d1ab29c7894010dc88831fb7a0a51edb79136e450344183de5b1a8b52bd43",
+  "woff2Sha256": "cb91ab1323cdcfc6b8be723709368dfbe6aed727da8afb42522a1b2dab416e61",
+  "licenseSha256": "eeacf16032901d0ed0456876ec77b8f0fda6b3fecec7d972f8543eb602e6c30f",
+  "sourceTableCount": 18,
+  "decodedTableCount": 17,
+  "byteIdenticalTables": [
+    "GDEF",
+    "GPOS",
+    "GSUB",
+    "OS/2",
+    "cmap",
+    "cvt ",
+    "fpgm",
+    "gasp",
+    "glyf",
+    "hhea",
+    "hmtx",
+    "loca",
+    "maxp",
+    "name",
+    "post",
+    "prep"
+  ],
+  "requiredFormatChanges": [
+    "empty DSIG removed",
+    "head.flags bit 11 set",
+    "head.checkSumAdjustment recalculated",
+    "SFNT table directory/order/padding reconstructed"
+  ],
+  "glyphCount": 13751,
+  "unicodeMappings": 11742,
+  "glyphOrderEqual": true,
+  "cmapEqual": true,
+  "nameTableEqual": true,
+  "glyphTransforms": [],
+  "woffMetadata": null,
+  "decodedChecksumValid": true,
+  "verified": true
+}

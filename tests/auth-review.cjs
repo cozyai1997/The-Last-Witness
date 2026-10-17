@@ -6,7 +6,7 @@ const {createService,WORLD_KEY}=require(path.join(repo,'lib/game-service.cjs'));
 const {MemoryStore}=require(path.join(repo,'lib/store.cjs'));
 const Party=require(path.join(repo,'lib/party-engine.cjs'));
 const Passwords=require(path.join(repo,'lib/passwords.cjs'));
-const PASS='Independent Review!8723',DAY=86400000;
+const PASS='ReviewPass8723!',DAY=86400000;
 let sequence=0;const id=()=> 'review-request-'+(++sequence);
 const delay=()=>new Promise(resolve=>setImmediate(resolve));
 function latch(){let resolve;const promise=new Promise(r=>{resolve=r;});return{promise,resolve};}
@@ -24,7 +24,7 @@ async function fixture(store=new MemoryStore(),n=2){
 async function poll(f,token){return f.call({op:'poll',token});}
 async function action(f,token,event){const {room}=await poll(f,token);return f.call({op:'action',token,event,revision:room.revision,requestId:id()});}
 async function upgrade(f,index,name){return f.call({op:'register',token:f.tokens[index],name,password:PASS});}
-function stateCore(g){return{phase:g.phase,round:g.round,turnOwnerId:g.turnOwnerId,kits:g.kits,statements:g.statements,facts:g.facts,log:g.log,notes:g.notes,pending:g.pending,secret:g.caseSecret,self:{id:g.self.id,role:g.self.role,clues:g.self.clues,shared:g.self.shared,sabotageLeft:g.self.sabotageLeft,guardLeft:g.self.guardLeft}};}
+function stateCore(g){return{phase:g.phase,round:g.round,turnOwnerId:g.turnOwnerId,kits:g.kits,statements:g.statements,facts:g.facts,log:g.log,notes:g.notes,pending:g.pending,review:g.review,rulesVersion:g.rulesVersion,secret:g.caseSecret,self:{id:g.self.id,role:g.self.role,clues:g.self.clues,shared:g.self.shared,sabotageLeft:g.self.sabotageLeft,guardLeft:g.self.guardLeft}};}
 const reports=[];
 (async()=>{
  // Hashing is intentionally held outside the CAS transaction. A legal game
@@ -92,6 +92,6 @@ const reports=[];
    const g=recovered.room.game,criminal=['culprit','accomplice'].includes(g.self.role);assert.equal(Object.hasOwn(g,'caseSecret'),criminal);assert.equal(Object.hasOwn(g,'partnerIds'),criminal);assert.equal(Object.hasOwn(g,'remainingLies'),criminal);assert.ok(g.players.every(p=>Object.keys(p).every(k=>['id','name','isDetective'].includes(k))));assert.ok(!JSON.stringify(recovered).includes('scrypt'));assert.ok(!JSON.stringify(recovered).includes('tokenHash'));assert.ok(!JSON.stringify(recovered).includes(PASS));}
   reports.push({check:'six expired sessions recover exact roles without other-role or hash leakage',passed:true});
  }
- const report={schemaVersion:1,recordedAt:new Date().toISOString(),scope:'Independent controlled-race and projection review, not a penetration test',storage:'Isolated in-memory test store; synthetic cases only',productionRequests:0,runtimeFilesModified:false,sourceSHA256:Object.fromEntries(['lib/passwords.cjs','lib/game-service.cjs'].map(file=>[file,crypto.createHash('sha256').update(fs.readFileSync(path.join(repo,file))).digest('hex')])),passed:true,checkCount:reports.length,reports};
+ const report={schemaVersion:1,recordedAt:new Date().toISOString(),scope:'Independent controlled-race and projection review, not a penetration test',storage:'Isolated in-memory test store; synthetic cases only',productionRequests:0,runtimeFilesModified:false,sourceSHA256:Object.fromEntries(['lib/passwords.cjs','lib/game-service.cjs','lib/party-engine.cjs'].map(file=>[file,crypto.createHash('sha256').update(fs.readFileSync(path.join(repo,file))).digest('hex')])),passed:true,checkCount:reports.length,reports};
  fs.mkdirSync(path.join(repo,'docs'),{recursive:true});fs.writeFileSync(path.join(repo,'docs/AUTH-SECURITY-REVIEW.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));
 })().catch(error=>{console.error(error);process.exitCode=1;});

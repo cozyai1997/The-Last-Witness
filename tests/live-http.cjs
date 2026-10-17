@@ -17,7 +17,7 @@ async function mutate(index,op,extra={}) {const room=await poll(index);return (a
 function actual(secret,cat){const order=['coat','hand','item','zone','light'].indexOf(cat);const s=Number(secret.suspectId.slice(1)),p=Number(secret.placeId.slice(1));return order<3?(s>>(2-order))&1:(p>>(4-order))&1;}
 (async()=>{
  const suffix=crypto.randomBytes(2).toString('hex');
- for(let i=0;i<7;i++){const credential={name:'검증'+suffix+'-'+(i+1),password:crypto.randomBytes(20).toString('base64url')};credentials.push(credential);const login=await request({op:'register',...credential});assert.equal(login.room,null);tokens.push(login.token);}
+ for(let i=0;i<7;i++){const credential={name:'검증'+suffix+'-'+(i+1),password:crypto.randomBytes(8).toString('base64url')};credentials.push(credential);const login=await request({op:'register',...credential});assert.equal(login.room,null);tokens.push(login.token);}
  let room=await mutate(0,'create',{capacity:6});const code=room.code;
  await Promise.all(tokens.slice(1,6).map(token=>request({op:'join',token,code,requestId:crypto.randomUUID()})));
  room=await poll(0);assert.equal(room.members.length,6);
@@ -26,6 +26,7 @@ function actual(secret,cat){const order=['coat','hand','item','zone','light'].in
  await request({op:'start',token:tokens[1],revision:room.revision,requestId:crypto.randomUUID()},403);
  for(let i=0;i<6;i++)await mutate(i,'ready',{ready:true});
  room=await mutate(0,'start');
+ assert.equal(room.game.rulesVersion,2);assert.match(room.caseId,/^[0-9a-f-]{36}$/);const firstCaseId=room.caseId;
  const views=await Promise.all(tokens.slice(0,6).map((_,i)=>poll(i)));
  const engineIds=views.map(v=>v.game.self.id);
  const roles=views.map(v=>v.game.self.role);
@@ -35,6 +36,8 @@ function actual(secret,cat){const order=['coat','hand','item','zone','light'].in
  for(const v of views){const g=v.game;assert.equal(g.secretNPC,undefined);assert.equal(g.seed,undefined);assert.ok(g.players.every(p=>p.role===undefined&&p.clues===undefined));assert.equal(!!g.caseSecret,['culprit','accomplice'].includes(g.self.role));assert.ok(!JSON.stringify(v).includes(tokens[0]));}
  async function current(){return poll(0);}
  async function ownerAction(event){const r=await current();const index=engineIds.indexOf(r.game.turnOwnerId);assert.ok(index>=0);return mutate(index,'action',{event});}
+ await mutate(suspect,'action',{event:{type:'ADD_NOTE',speakerId:engineIds[criminal],text:'역할 확인 중에도 자유 발언'}});
+ assert.equal((await current()).game.notes.at(-1).speakerId,engineIds[suspect]);
  while((await current()).game.phase==='reveal')await ownerAction({type:'ROLE_SEEN'});
  for(let round=1;round<=5;round++){
   while((await current()).game.phase==='secret'){
@@ -51,14 +54,22 @@ function actual(secret,cat){const order=['coat','hand','item','zone','light'].in
   await request({op:'action',token:tokens[wrong],revision:room.revision,requestId:crypto.randomUUID(),event:{type:'INVESTIGATE',actorId:room.game.detectiveId,kind:'pass'}},403);
   if(round===5){
    await request({op:'action',token:tokens[detective],revision:room.revision,requestId:crypto.randomUUID(),event:{type:'ACCUSE',...secret}},409);
-   const old=room.game.statements.find(s=>s.round===3);assert.ok(old);
-   room=await mutate(detective,'action',{event:{type:'INVESTIGATE',kind:'audit',statementId:old.id}});
-   assert.equal(room.game.kits,0);assert.equal(room.game.statements.find(s=>s.id===old.id).value,old.value);assert.ok(room.game.facts.some(f=>f.statementId===old.id&&f.value===actual(secret,old.category)));
+   room=await mutate(detective,'action',{event:{type:'INVESTIGATE',kind:'pass'}});
+   assert.equal(room.game.review.kind,'pass');
   } else {
    const cat=['coat','hand','light','zone'][round-1];const targetId=engineIds[criminal];
-   room=await mutate(detective,'action',{event:{type:'INVESTIGATE',kind:'question',targetId,category:cat}});
-   if(round===2){assert.equal(room.game.phase,'discussion');}else{
-    assert.equal(room.game.phase,'answer');room=await mutate(criminal,'action',{event:{type:'ANSWER',value:actual(secret,cat)^(round>=3?1:0)}});
+   room=await mutate(detective,'action',{event:{type:'INVESTIGATE',kind:'question',targetId,category:cat,proposedValue:round%2}});
+   if(round===2){assert.equal(room.game.phase,'discussion');assert.equal(room.game.review.kind,'blocked');assert.equal(room.game.kits,1);}else{
+    assert.equal(room.game.phase,'answer');assert.equal(room.game.pending.proposedValue,round%2);
+    if(round===1){await mutate(suspect,'action',{event:{type:'ADD_NOTE',text:'답변을 기다리며 공개 대화'}});assert.equal((await current()).game.phase,'answer');}
+    room=await mutate(criminal,'action',{event:{type:'ANSWER',value:actual(secret,cat)^(round>=3?1:0)}});
+    assert.equal(room.game.review.kind,'answer');assert.equal(room.game.review.proposedValue,round%2);assert.equal(room.game.review.verified,false);assert.equal(room.game.review.actualValue,undefined);
+    if(round===3){
+     const claim=structuredClone(room.game.statements.at(-1));
+     room=await mutate(detective,'action',{event:{type:'REVIEW_RESULT',kind:'audit',statementId:claim.id}});
+     assert.equal(room.game.kits,0);assert.equal(room.game.review.verified,true);assert.equal(room.game.review.value,claim.value);assert.equal(room.game.review.actualValue,actual(secret,cat));
+     assert.equal(room.game.statements.at(-1).value,claim.value);assert.ok(room.game.facts.some(f=>f.statementId===claim.id&&f.value===actual(secret,cat)));
+    }
    }
   }
   assert.equal(room.game.phase,'discussion');
@@ -66,15 +77,33 @@ function actual(secret,cat){const order=['coat','hand','item','zone','light'].in
   const before=structuredClone(room.game.facts);
   const free=await mutate(suspect,'action',{event:{type:'ADD_NOTE',speakerId:engineIds[criminal],text:'자유 발언 <b>검증</b>'}});
   assert.equal(free.game.notes.at(-1).speakerId,engineIds[suspect]);assert.deepEqual(free.game.facts,before);
-  if(round<5)await mutate(detective,'action',{event:{type:'END_ROUND'}});
+  room=await mutate(detective,'action',{event:{type:'REVIEW_RESULT',kind:'confirm'}});
+  assert.equal(room.game.phase,round<5?'secret':'final');assert.equal(room.game.round,round<5?round+1:5);
+  if(round<5)assert.equal(room.game.review,null);
  }
+ await mutate(suspect,'action',{event:{type:'ADD_NOTE',text:'최종 지목 전 의견'}});
  room=await mutate(detective,'action',{event:{type:'ACCUSE',...secret}});
  assert.equal(room.game.winner,'investigators');assert.equal(room.status,'finished');assert.equal(room.game.reveal.players.length,6);
  const final=await Promise.all(tokens.slice(0,6).map((_,i)=>poll(i)));assert.ok(final.every(v=>v.game.winner==='investigators'));
  const reconnect=await poll(criminal);assert.equal(reconnect.game.self.id,views[criminal].game.self.id);assert.deepEqual(reconnect.game.caseSecret,secret);
- room=await mutate(0,'restart');assert.equal(room.game,null);assert.ok(room.members.every(m=>!m.ready&&!m.gameId));
+ room=await mutate(0,'restart');assert.equal(room.game,null);assert.equal(room.caseId,undefined);assert.ok(room.members.every(m=>!m.ready&&!m.gameId));
  for(let i=0;i<6;i++)await mutate(i,'leave');
  assert.equal(await poll(0),null);
- const result={base,passed:true,sessions:7,simultaneousPlayers:6,rounds:5,serverRequests:measurements.length,maxRequestMs:Math.max(...measurements),averageRequestMs:Math.round(measurements.reduce((a,b)=>a+b,0)/measurements.length),privacy:true,capacityRace:true,protectedEvidence:true,sharedLieBudget:true,guardAndSeal:true,reconnect:true,passwordReLogin:true,logoutPreservesSeat:true,restart:true};
+ // Reuse two authenticated accounts to exercise the separate new-duo rules.
+ room=await mutate(0,'create',{capacity:2});const duoCode=room.code;
+ await mutate(1,'join',{code:duoCode});await mutate(0,'ready',{ready:true});await mutate(1,'ready',{ready:true});room=await mutate(0,'start');
+ assert.notEqual(room.caseId,firstCaseId);assert.equal(room.game.facts.length,2);assert.equal(new Set(room.game.facts.map(f=>f.category)).size,2);
+ const duoViews=await Promise.all([poll(0),poll(1)]),duoIds=duoViews.map(v=>v.game.self.id),duoD=duoViews.findIndex(v=>v.game.self.role==='detective'),duoC=1-duoD;
+ while((room=await current()).game.phase==='reveal')await mutate(duoIds.indexOf(room.game.turnOwnerId),'action',{event:{type:'ROLE_SEEN'}});
+ assert.equal(room.game.phase,'secret');assert.equal(room.game.turnOwnerId,duoIds[duoC]);
+ await request({op:'action',token:tokens[duoD],revision:room.revision,requestId:crypto.randomUUID(),event:{type:'SECRET_ACTION',kind:'pass'}},403);
+ await request({op:'action',token:tokens[duoC],revision:room.revision,requestId:crypto.randomUUID(),event:{type:'SECRET_ACTION',kind:'suggest',category:'coat'}},400);
+ room=await mutate(duoC,'action',{event:{type:'SECRET_ACTION',kind:'pass'}});assert.equal(room.game.phase,'investigate');
+ const duoSecret=duoViews[duoC].game.caseSecret;
+ room=await mutate(duoD,'action',{event:{type:'INVESTIGATE',kind:'question',category:'coat',targetId:duoIds[duoC],proposedValue:1}});
+ assert.equal(room.game.pending.proposedValue,1);room=await mutate(duoC,'action',{event:{type:'ANSWER',value:actual(duoSecret,'coat')}});
+ room=await mutate(duoD,'action',{event:{type:'REVIEW_RESULT',kind:'confirm'}});assert.equal(room.game.round,2);assert.equal(room.game.turnOwnerId,duoIds[duoC]);
+ await mutate(duoC,'action',{event:{type:'SECRET_ACTION',kind:'pass'}});await mutate(duoD,'action',{event:{type:'ACCUSE',...duoSecret}});await mutate(0,'restart');await mutate(0,'leave');await mutate(1,'leave');
+ const result={base,passed:true,sessions:7,simultaneousPlayers:6,rounds:5,serverRequests:measurements.length,maxRequestMs:Math.max(...measurements),averageRequestMs:Math.round(measurements.reduce((a,b)=>a+b,0)/measurements.length),privacy:true,capacityRace:true,protectedEvidence:true,sharedLieBudget:true,guardAndSeal:true,reconnect:true,passwordReLogin:true,logoutPreservesSeat:true,restart:true,reviewAuditAndConfirm:true,finalPhase:true,proposedQuestions:true,chatDuringPrivateAndAnswerAndFinal:true,duoSimplified:true,caseIdentity:true};
  const output=process.env.TEST_REPORT||require('node:path').join(__dirname,'../work/online-http-result.json');fs.mkdirSync(require('node:path').dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify(result,null,2));console.log(result);
 })().catch(e=>{console.error(e.message);process.exit(1)});

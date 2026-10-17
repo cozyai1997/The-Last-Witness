@@ -7,7 +7,7 @@ const path=require('node:path');
 const {MemoryStore}=require('../lib/store.cjs');
 const {createService,WORLD_KEY}=require('../lib/game-service.cjs');
 const Party=require('../lib/party-engine.cjs');
-const DAY=86400000,PASS='Correct horse battery 42!';
+const DAY=86400000,PASS='StrongPass42!';
 let sequence=0;
 const requestId=()=> 'auth-request-'+(++sequence);
 function fixture(){let time=1700000000000;const store=new MemoryStore(),service=createService({store,now:()=>time,sessionSecret:'auth-test-secret',gameOptions:{seed:17,secret:{suspectId:'s0',placeId:'p0'}}});return {store,service,advance(ms){time+=ms;},call(body,ip='192.0.2.10'){return service.handle(body,{ip});}};}
@@ -28,9 +28,17 @@ async function legacyWorld(f,n=2){
 test('password storage uses salted OWASP scrypt, never trims, and rejects invalid lengths',async()=>{
  assert.ok(fs.existsSync(path.join(__dirname,'../lib/passwords.cjs')),'password hashing module must exist');const P=require('../lib/passwords.cjs');
  const a=await P.hashPassword(PASS),b=await P.hashPassword(PASS);assert.equal(a.N,131072);assert.equal(a.r,8);assert.equal(a.p,1);assert.notEqual(a.salt,b.salt);assert.notEqual(a.hash,b.hash);assert.equal(await P.verifyPassword(PASS,a),true);assert.equal(await P.verifyPassword(PASS+' ',a),false);assert.equal(await P.verifyPassword('bad-password',a),false);assert.ok(!JSON.stringify(a).includes(PASS));
- for(const value of ['', 'short', 'x'.repeat(129), '😀'.repeat(129)])assert.throws(()=>P.validatePassword(value));
- assert.doesNotThrow(()=>P.validatePassword('😀'.repeat(128)));
+ for(const value of ['', 'short', 'x'.repeat(17), '😀'.repeat(17)])assert.throws(()=>P.validatePassword(value));
+ assert.doesNotThrow(()=>P.validatePassword('😀'.repeat(16)));
  const spaced='  secret12  ';const hash=await P.hashPassword(spaced);assert.equal(await P.verifyPassword(spaced,hash),true);assert.equal(await P.verifyPassword(spaced.trim(),hash),false);
+});
+test('new passwords are 8–16 characters while existing 17–128-character accounts can still log in',async()=>{
+ const P=require('../lib/passwords.cjs'),f=fixture(),legacy='Legacy password longer than16!';assert.throws(()=>P.validatePassword(legacy));assert.doesNotThrow(()=>P.validateLoginPassword(legacy));
+ await assert.rejects(()=>f.call({op:'register',name:'Too long',password:legacy}),e=>e.code==='INVALID_PASSWORD');
+ const salt=crypto.randomBytes(16),key=await new Promise((resolve,reject)=>crypto.scrypt(legacy,salt,64,P.PARAMETERS,(error,value)=>error?reject(error):resolve(value)));
+ const account={id:'m_existing_long',name:'Legacy long',roomCode:null,createdAt:1700000000000,password:{algorithm:'scrypt',N:131072,r:8,p:1,salt:salt.toString('base64url'),hash:key.toString('base64url')}};
+ const accountKey='a_'+crypto.createHash('sha256').update('legacy long').digest('hex');const doc=await f.store.get(WORLD_KEY);doc.value.accounts[accountKey]=account;assert.ok(await f.store.CAS(WORLD_KEY,doc.rev,doc.value));
+ const response=await login(f,'Legacy long',legacy);assert.equal(response.account.id,account.id);assert.equal(response.room,null);
 });
 test('registration normalizes nicknames and atomically rejects normalization races',async()=>{
  const f=fixture(),results=await Promise.allSettled([register(f,' Ａlice '),register(f,'alice')]);assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(results.find(x=>x.status==='rejected').reason.code,'NAME_TAKEN');
@@ -103,7 +111,7 @@ test('six players can reauthenticate between rounds without changing role, secre
   await mutate(f,tokens[(owner+1)%6],'action',{event:{type:'ADD_NOTE',text:'Round '+round}});
   views=await Promise.all(tokens.map(t=>poll(f,t)));
   for(let i=0;i<6;i++){const old=tokens[i],next=await login(f,names[i]);tokens[i]=next.token;assert.deepEqual(next.room.game,views[i].room.game);assert.equal(next.room.meId,views[i].room.meId);await assert.rejects(()=>poll(f,old),e=>e.status===401);}
-  if(round===5)await mutate(f,tokens[owner],'action',{event:{type:'ACCUSE',suspectId:'s0',placeId:'p0'}});
+  if(round===5){await mutate(f,tokens[owner],'action',{event:{type:'REVIEW_RESULT',kind:'confirm'}});await mutate(f,tokens[owner],'action',{event:{type:'ACCUSE',suspectId:'s0',placeId:'p0'}});}
   else{
    await mutate(f,tokens[owner],'action',{event:{type:'END_ROUND'}});room=(await poll(f,tokens[0])).room;
    while(room.game.phase==='secret'){const index=room.members.findIndex(m=>m.gameId===room.game.turnOwnerId),nextRound=round+1;

@@ -7,7 +7,7 @@ function modules(){for(const f of ['../lib/store.cjs','../lib/game-service.cjs',
 let seq=0;
 function rid(){return 'request-'+(++seq);}
 function fixture(options={}){const {store,service}=modules();let clock=1700000000000;const backend=new store.MemoryStore();const svc=service.createService({store:backend,now:()=>clock,sessionSecret:'test-session-secret',gameOptions:{seed:17,secret:{suspectId:'s0',placeId:'p0'}},...options});return {backend,svc,advance(ms){clock+=ms;},async call(body,ip='127.0.0.1'){return svc.handle(body,{ip});}};}
-const TEST_PASSWORD='Strong test password 42!';
+const TEST_PASSWORD='StrongPass42!';
 async function login(f,name){return (await f.call({op:'register',name,password:TEST_PASSWORD,requestId:rid()})).token;}
 async function create(f,token,capacity=6){return (await f.call({op:'create',token,capacity,requestId:rid()})).room;}
 async function poll(f,token){return (await f.call({op:'poll',token})).room;}
@@ -87,15 +87,26 @@ test('lobby leave transfers host and kick removes the room association without e
  const target=room.members.find(x=>x.id!==room.meId);await mutate(f,tokens[1],'kick',{targetId:target.id});assert.equal(await poll(f,tokens[2]),null);room=await poll(f,tokens[1]);assert.equal(room.members.length,1);
 });
 test('a full six-player game completes five rounds, safely reveals results, and restarts to unready lobby',async()=>{
- const f=fixture(),{tokens}=await started(f);let room;
+ const f=fixture(),{tokens,room:initial}=await started(f);let room;assert.match(initial.caseId,/^[0-9a-f-]{36}$/);
  for(let r=1;r<=5;r++){
   room=await finishPrivate(f,tokens);assert.equal(room.game.round,r);
   if(r===5)await assert.rejects(()=>engineAction(f,tokens,{type:'ACCUSE',suspectId:'s0',placeId:'p0'}),e=>e.code==='FINAL_INVESTIGATION_REQUIRED');
   await engineAction(f,tokens,{type:'INVESTIGATE',kind:'pass'});
   if(r<5)await engineAction(f,tokens,{type:'END_ROUND'});
  }
- room=(await engineAction(f,tokens,{type:'ACCUSE',suspectId:'s0',placeId:'p0'})).room;assert.equal(room.status,'finished');assert.equal(room.game.winner,'investigators');assert.deepEqual(room.game.reveal.secret,{suspectId:'s0',placeId:'p0'});
- await assert.rejects(()=>mutate(f,tokens[1],'restart'),e=>e.status===403);room=(await mutate(f,tokens[0],'restart')).room;assert.equal(room.status,'lobby');assert.equal(room.game,null);assert.ok(room.members.every(m=>!m.ready));
+ await engineAction(f,tokens,{type:'REVIEW_RESULT',kind:'confirm'});room=(await engineAction(f,tokens,{type:'ACCUSE',suspectId:'s0',placeId:'p0'})).room;assert.equal(room.status,'finished');assert.equal(room.game.winner,'investigators');assert.deepEqual(room.game.reveal.secret,{suspectId:'s0',placeId:'p0'});
+ await assert.rejects(()=>mutate(f,tokens[1],'restart'),e=>e.status===403);room=(await mutate(f,tokens[0],'restart')).room;assert.equal(room.status,'lobby');assert.equal(room.game,null);assert.equal(room.caseId,undefined);assert.ok(room.members.every(m=>!m.ready));
+ for(const token of tokens)await mutate(f,token,'ready',{ready:true});room=(await mutate(f,tokens[0],'start')).room;assert.notEqual(room.caseId,initial.caseId);
+});
+test('review audit/confirm races are authenticated, idempotent, and cannot spend the kit or advance twice',async()=>{
+ const f=fixture(),{tokens}=await started(f),views=await Promise.all(tokens.map(t=>poll(f,t)));let room=views[0];const c=views.findIndex(v=>v.game.self.role==='culprit'),d=views.findIndex(v=>v.game.self.role==='detective'),other=views.findIndex((v,i)=>i!==d);
+ await mutate(f,tokens[other],'action',{event:{type:'ADD_NOTE',speakerId:views[d].game.self.id,text:'비공개 확인 중에도 내 이름으로 토론'}});room=await finishPrivate(f,tokens);
+ room=(await mutate(f,tokens[d],'action',{event:{type:'INVESTIGATE',kind:'question',targetId:views[c].game.self.id,category:'coat',proposedValue:1}})).room;assert.equal(room.game.pending.proposedValue,1);
+ await mutate(f,tokens[d],'action',{event:{type:'ADD_NOTE',speakerId:views[c].game.self.id,text:'답변을 기다리며 토론'}});room=await poll(f,tokens[d]);assert.equal(room.game.phase,'answer');assert.equal(room.game.notes.at(-1).speakerId,views[d].game.self.id);
+ room=(await mutate(f,tokens[c],'action',{event:{type:'ANSWER',value:1}})).room;assert.equal(room.game.review.actualValue,undefined);
+ await assert.rejects(()=>mutate(f,tokens[c],'action',{event:{type:'REVIEW_RESULT',kind:'audit'}}),e=>e.status===403);
+ const audit={op:'action',token:tokens[d],revision:room.revision,requestId:rid(),event:{type:'REVIEW_RESULT',kind:'audit'}};const duplicated=await Promise.all([f.call(audit),f.call(audit)]);assert.ok(duplicated.every(r=>r.room.game.kits===0));room=await poll(f,tokens[d]);assert.equal(room.game.facts.length,1);assert.equal(room.game.review.actualValue,0);assert.equal(room.game.review.verified,true);
+ const revision=room.revision;const confirmed=await Promise.allSettled([1,2].map(()=>f.call({op:'action',token:tokens[d],revision,requestId:rid(),event:{type:'REVIEW_RESULT',kind:'confirm'}})));assert.equal(confirmed.filter(r=>r.status==='fulfilled').length,1);assert.equal(confirmed.filter(r=>r.status==='rejected'&&r.reason.status===409).length,1);room=await poll(f,tokens[d]);assert.equal(room.game.round,2);assert.equal(room.game.review,null);
 });
 test('sessions expire after 24 hours while account rooms retain thirty days of inactivity',async()=>{
  const f=fixture(),token=await login(f,'A');await create(f,token,2);f.advance(23*3600000);assert.ok(await poll(f,token));f.advance(3600001);await assert.rejects(()=>poll(f,token),e=>e.status===401);

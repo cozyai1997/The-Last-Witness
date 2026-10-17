@@ -114,7 +114,7 @@ test('questions target another human, consume one investigation, and only the ta
  assert.throws(()=>investigate(s,{kind:'question',category:'coat',targetId:s.detectiveId}));assert.throws(()=>investigate(s,{kind:'question',category:'coat',targetId:'s0'}));
  assert.throws(()=>P.act(s,{type:'INVESTIGATE',actorId:c.id,kind:'pass'}));
  s=investigate(s,{kind:'question',targetId:c.id,category:'coat'});assert.equal(s.phase,'answer');assert.equal(P.turnOwner(s),c.id);
- assert.equal(P.privateView(s,c.id).self.id,c.id);assert.deepEqual(P.publicView(s).pending,{targetId:c.id,category:'coat'});
+ assert.equal(P.privateView(s,c.id).self.id,c.id);assert.deepEqual(P.publicView(s).pending,{targetId:c.id,category:'coat',proposedValue:0});
  assert.throws(()=>P.act(s,{type:'ANSWER',actorId:s.detectiveId,value:0}));assert.throws(()=>investigate(s,{kind:'pass'}));assert.throws(()=>P.act(s,{type:'ACCUSE',actorId:s.detectiveId,suspectId:'s0',placeId:'p0'}));
  s=P.act(s,{type:'ANSWER',actorId:c.id,value:1});assert.equal(s.phase,'discussion');assert.equal(s.pending,null);assert.equal(s.liesUsed,1);assert.equal(s.statements.length,1);
  assert.throws(()=>investigate(s,{kind:'pass'}));
@@ -154,7 +154,7 @@ test('five rounds cap all resources, early NPC accusation is allowed, and victor
   assert.equal(s.round,r);s=investigate(s,{kind:'pass'});assert.equal(P.turnOwner(s),s.detectiveId);
   if(r<5){s=P.act(s,{type:'END_ROUND',actorId:s.detectiveId});s=prepare(s);}else assert.throws(()=>P.act(s,{type:'END_ROUND',actorId:s.detectiveId}));
  }
- s=P.act(s,{type:'ACCUSE',actorId:s.detectiveId,suspectId:'s0',placeId:'p0'});assert.equal(s.winner,'investigators');assert.equal(s.phase,'finished');assert.equal(P.turnOwner(s),null);
+ s=P.act(s,{type:'REVIEW_RESULT',actorId:s.detectiveId,kind:'confirm'});s=P.act(s,{type:'ACCUSE',actorId:s.detectiveId,suspectId:'s0',placeId:'p0'});assert.equal(s.winner,'investigators');assert.equal(s.phase,'finished');assert.equal(P.turnOwner(s),null);
  const v=P.publicView(s);assert.deepEqual(v.reveal.secret,{suspectId:'s0',placeId:'p0'});assert.equal(v.reveal.players.length,6);assert.ok(v.reveal.players.every(p=>p.role));assert.throws(()=>P.act(s,{type:'ADD_NOTE',speakerId:s.detectiveId,text:'x'}));
  let wrong=prepare(reveal(make(2)));assert.throws(()=>P.act(wrong,{type:'ACCUSE',actorId:wrong.detectiveId,suspectId:'u0',placeId:'p0'}));wrong=P.act(wrong,{type:'ACCUSE',actorId:wrong.detectiveId,suspectId:'s0',placeId:'p1'});assert.equal(wrong.winner,'criminals');
 });
@@ -197,7 +197,7 @@ test('all three criminal-camp sabotage charges exhaust permanently without refre
  }
 });
 test('a shared clue cannot be shared twice, while a later matching official fact is valid history',()=>{
- const P=api();let s=reveal(make(2));const d=player(s,'detective'),cat=d.clues[0].category;
+ const P=api();let s=JSON.parse(JSON.stringify(make(2)));delete s.rulesVersion;s.facts=[];s.log=[];s.players.forEach(p=>{p.shared=[];});s=reveal(s);const d=player(s,'detective'),cat=d.clues[0].category;
  s=prepare(s);s=investigate(s,{kind:'search',category:cat,value:1-categoryValue(s,cat)});assert.equal(s.facts[0].value,categoryValue(s,cat));
  s=P.act(s,{type:'END_ROUND',actorId:s.detectiveId});s=prepare(s,p=>p.role==='detective'?{kind:'share',category:cat}:{kind:'pass'});assert.equal(s.facts.length,2);assert.equal(s.facts[0].value,s.facts[1].value);
  s=investigate(s,{kind:'pass'});s=P.act(s,{type:'END_ROUND',actorId:s.detectiveId});
@@ -209,4 +209,38 @@ test('the browser UMD API works without require and invalid seeds or NPC options
  assert.equal(typeof context.WitnessParty.makeGame,'function');assert.equal(context.WitnessParty.makeGame(['가','나'],{seed:0}).players.length,2);
  const P=api();for(const seed of [-1,1.5,4294967296,'1'])assert.throws(()=>P.makeGame(names(2),{seed}));
  assert.throws(()=>P.makeGame(names(2),{secret:{suspectId:'u0',placeId:'p0'}}));assert.throws(()=>P.makeGame(names(2),{secret:{suspectId:'s0',placeId:'u1'}}));
+});
+test('new two-player games publish both starting clues and skip only detective secret turns',()=>{
+ const P=api();
+ for(let seed=0;seed<12;seed++){
+  let s=make(2,seed),d=player(s,'detective'),c=player(s,'culprit');assert.equal(s.rulesVersion,2);assert.equal(s.facts.length,2);assert.equal(P.candidates(P.publicView(s)).length,8);assert.deepEqual(d.shared.slice().sort(),d.clues.map(x=>x.category).sort());
+  s=reveal(s);assert.equal(P.turnOwner(s),c.id);assert.throws(()=>P.act(s,{type:'SECRET_ACTION',actorId:c.id,kind:'suggest',category:'coat'}));assert.throws(()=>P.act(s,{type:'SECRET_ACTION',actorId:c.id,kind:'share',category:d.clues[0].category}));
+  s=P.act(s,{type:'SECRET_ACTION',actorId:c.id,kind:'pass'});assert.equal(s.phase,'investigate');s=investigate(s,{kind:'pass'});s=P.act(s,{type:'REVIEW_RESULT',actorId:d.id,kind:'confirm'});assert.equal(s.phase,'secret');assert.equal(P.turnOwner(s),c.id);assert.equal(s.review,null);
+ }
+});
+test('flagless ongoing two-player games retain detective share and both private turns',()=>{
+ const P=api();let s=JSON.parse(JSON.stringify(make(2)));delete s.rulesVersion;delete s.review;s.facts=[];s.log=[];s.players.forEach(p=>{p.shared=[];});s=reveal(s);let turns=0;
+ while(s.phase==='secret'){const id=P.turnOwner(s),p=s.players.find(x=>x.id===id);s=P.act(s,{type:'SECRET_ACTION',actorId:id,kind:p.role==='detective'?'share':'suggest',category:p.role==='detective'?p.clues[0].category:'coat'});turns++;}
+ assert.equal(turns,2);assert.equal(s.facts.length,1);assert.equal(s.phase,'investigate');
+});
+test('the immediate answer review can spend the single kit once without leaking the truth beforehand',()=>{
+ const P=api();let s=prepare(reveal(make()));const c=player(s,'culprit');s=investigate(s,{kind:'question',targetId:c.id,category:'coat',proposedValue:1});assert.equal(s.pending.proposedValue,1);
+ s=P.act(s,{type:'ANSWER',actorId:c.id,value:1});assert.equal(s.phase,'discussion');assert.deepEqual(P.publicView(s).review,{kind:'answer',round:1,category:'coat',targetId:c.id,statementId:'statement-1',value:1,verified:false,proposedValue:1});
+ assert.throws(()=>P.act(s,{type:'REVIEW_RESULT',actorId:c.id,kind:'audit'}));assert.throws(()=>P.act(s,{type:'REVIEW_RESULT',actorId:s.detectiveId,kind:'audit',statementId:'wrong'}));
+ s=P.act(s,{type:'REVIEW_RESULT',actorId:s.detectiveId,kind:'audit'});assert.equal(s.phase,'discussion');assert.equal(s.kits,0);assert.equal(s.review.value,1);assert.equal(s.review.actualValue,0);assert.equal(s.review.verified,true);assert.equal(s.statements[0].value,1);assert.equal(s.statements[0].audited,true);assert.equal(s.liesUsed,1);assert.equal(s.facts[0].value,0);assertTruthSurvives(s);
+ assert.throws(()=>P.act(s,{type:'REVIEW_RESULT',actorId:s.detectiveId,kind:'audit'}));const old=s;s=P.act(s,{type:'REVIEW_RESULT',actorId:s.detectiveId,kind:'confirm'});assert.equal(s.round,2);assert.equal(s.phase,'secret');assert.equal(s.review,null);assert.equal(old.facts.length,1);assert.throws(()=>P.act(s,{type:'REVIEW_RESULT',actorId:s.detectiveId,kind:'confirm'}));
+});
+test('all investigation outcomes have public review summaries and fifth confirmation enters final',()=>{
+ const P=api();let searched=investigate(prepare(reveal(make())),{kind:'search',category:'coat'});assert.equal(searched.review.kind,'search');assert.equal(searched.review.value,0);assert.equal(searched.review.verified,true);
+ let blocked=prepare(reveal(make()),p=>p.role==='culprit'?{kind:'seal',category:'coat'}:{kind:'pass'});blocked=investigate(blocked,{kind:'question',category:'coat',targetId:player(blocked,'culprit').id});assert.equal(blocked.review.kind,'blocked');assert.equal(blocked.review.value,undefined);assert.equal(blocked.review.actualValue,undefined);
+ let unknown=prepare(reveal(make())),w=player(unknown,'witness'),cat=P.CATEGORIES.find(x=>!w.clues.some(c=>c.category===x.id)).id;unknown=investigate(unknown,{kind:'question',category:cat,targetId:w.id});unknown=P.act(unknown,{type:'ANSWER',actorId:w.id,value:null});assert.equal(unknown.review.kind,'unknown');assert.equal(unknown.review.value,null);assert.equal(unknown.review.statementId,undefined);
+ let s=prepare(reveal(make()));for(let round=1;round<=5;round++){s=investigate(s,{kind:'pass'});assert.equal(s.review.kind,'pass');s=P.act(s,{type:'REVIEW_RESULT',actorId:s.detectiveId,kind:'confirm'});if(round<5)s=prepare(s);}
+ assert.equal(s.phase,'final');assert.equal(P.turnOwner(s),s.detectiveId);assert.equal(s.review.kind,'pass');assert.throws(()=>investigate(s,{kind:'pass'}));assert.throws(()=>P.act(s,{type:'REVIEW_RESULT',actorId:s.detectiveId,kind:'confirm'}));s=P.act(s,{type:'ACCUSE',actorId:s.detectiveId,suspectId:'s0',placeId:'p0'});assert.equal(s.winner,'investigators');
+});
+test('authenticated free discussion is nonfactual in every active phase including pending answers and final',()=>{
+ const P=api();let s=make();const seen=new Set();
+ function note(){const before=P.candidates(P.publicView(s)),pending=s.pending;s=P.act(s,{type:'ADD_NOTE',speakerId:s.players[0].id,text:'동시에 토론합니다.'});assert.deepEqual(P.candidates(P.publicView(s)),before);assert.deepEqual(s.pending,pending);seen.add(s.phase);}
+ note();s=reveal(s);note();s=prepare(s);note();s=investigate(s,{kind:'question',category:'coat',targetId:player(s,'culprit').id});note();s=P.act(s,{type:'ANSWER',actorId:P.turnOwner(s),value:0});note();s=P.act(s,{type:'REVIEW_RESULT',actorId:s.detectiveId,kind:'confirm'});
+ for(let r=2;r<=5;r++){s=prepare(s);s=investigate(s,{kind:'pass'});s=P.act(s,{type:'REVIEW_RESULT',actorId:s.detectiveId,kind:'confirm'});}note();assert.deepEqual([...seen].sort(),['answer','discussion','final','investigate','reveal','secret']);
+ const forged=JSON.parse(JSON.stringify(s));forged.review={kind:'answer',round:5,category:'coat',value:1,verified:false,actualValue:0,secretNPC:forged.secretNPC};assert.equal(P.publicView(forged).review.actualValue,undefined);assert.equal(P.publicView(forged).review.secretNPC,undefined);
 });
