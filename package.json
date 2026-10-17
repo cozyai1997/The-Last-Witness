@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node scripts/build.cjs",
     "start": "node scripts/dev.cjs",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/*.test.cjs",
+    "test:security": "node tests/security-review.cjs"
   },
   "engines": { "node": ">=22" }
 }

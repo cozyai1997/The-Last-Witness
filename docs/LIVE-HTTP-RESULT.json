@@ -1,0 +1,17 @@
+{
+  "base": "https://the-last-witness-pi.vercel.app",
+  "passed": true,
+  "sessions": 7,
+  "simultaneousPlayers": 6,
+  "rounds": 5,
+  "serverRequests": 287,
+  "maxRequestMs": 2366,
+  "averageRequestMs": 401,
+  "privacy": true,
+  "capacityRace": true,
+  "protectedEvidence": true,
+  "sharedLieBudget": true,
+  "guardAndSeal": true,
+  "reconnect": true,
+  "restart": true
+}
