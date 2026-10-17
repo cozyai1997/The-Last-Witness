@@ -61,4 +61,5 @@ test('new default is v4 while persisted explicit legacy rooms remain byte-for-by
   newRoom = (await fresh.handle({ op: 'join', token: freshTokens[1], code: newRoom.code, requestId: crypto.randomUUID() }, { ip: 'new' })).room;
   for (const token of freshTokens) newRoom = (await fresh.handle({ op: 'ready', token, ready: true, revision: newRoom.revision, requestId: crypto.randomUUID() }, { ip: 'new' })).room;
   newRoom = (await fresh.handle({ op: 'start', token: freshTokens[0], revision: newRoom.revision, requestId: crypto.randomUUID() }, { ip: 'new' })).room; assert.equal(newRoom.game.rulesVersion, 4); assert.equal(newRoom.game.maxRounds, 7); assert.equal(newRoom.game.flowVersion, 2);
+  assert.equal(newRoom.game.detectiveVersion, 2); assert.equal(newRoom.game.kits, 2);
 });

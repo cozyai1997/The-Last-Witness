@@ -41,6 +41,20 @@
   function history(view, targetId, category) {
     return (view.questionHistory || []).filter(function (entry) { return (!targetId || entry.targetId === targetId) && (!category || entry.category === category); }).map(function (entry) { return Object.assign({}, entry); });
   }
+  function unresolvedClaim(view, statement, values) {
+    if (!statement || statement.audited || view.kits !== undefined && view.kits < 1) return false;
+    var category = D.CATEGORIES.find(function (c) { return c.id === statement.category; });
+    if (!category || !Number.isInteger(statement.value) || statement.value < 0 || statement.value >= category.values.length) return false;
+    var remaining = values[category.id];
+    // A proved false value and a proved true singleton both already have a
+    // verdict, even when a different speaker repeats the same proposition.
+    return remaining.length > 1 && remaining.includes(statement.value);
+  }
+  function auditAllowed(view, statementId) {
+    view = view || {};
+    var statement = (view.statements || []).find(function (s) { return s.id === statementId; });
+    return unresolvedClaim(view, statement, ranges(view, true).values);
+  }
   function options(view) {
     view = view || {};
     var personal = ranges(view, true), shared = ranges(publicOnly(view), false), remaining = {};
@@ -54,11 +68,12 @@
     });
     return {
       questions: categories.filter(function (c) { return c.available; }),
+      audits: (view.statements || []).filter(function (s) { return unresolvedClaim(view, s, personal.values); }).map(function (s) { return Object.assign({}, s); }),
       categories: categories,
       records: D.RECORDS.map(function (record) {
         var fact = (view.facts || []).find(function (f) { return f.source === 'record' && f.recordId === record.id; });
         var previous = (view.questionHistory || []).filter(function (h) { return h.recordId === record.id; }).slice(-1)[0];
-        return Object.assign({}, record, { acquired: !!fact, available: !fact, reason: fact ? '확보 완료 · 같은 원본은 다시 조사할 수 없습니다.' : previous && previous.status === 'blocked' ? '이전 봉쇄 · 다시 조사할 수 있습니다.' : '원본 미확보', category: fact ? fact.category : undefined });
+        return Object.assign({}, record, { acquired: !!fact, available: !fact && view.detectiveVersion !== 2, reason: fact ? '확보 완료 · 같은 원본은 다시 조사할 수 없습니다.' : view.detectiveVersion === 2 ? '공개 연결 자료를 대조하세요. 이 사건에서는 별도 원본 조사를 사용하지 않습니다.' : previous && previous.status === 'blocked' ? '이전 봉쇄 · 다시 조사할 수 있습니다.' : '원본 미확보', category: fact ? fact.category : undefined });
       }),
       abilities: D.CATEGORIES.map(function (c) {
         var values = shared.values[c.id], available = values.length > 1;
@@ -108,5 +123,5 @@
     reasons.push({ source: 'reference', label: '사건 연결 기록 대조', text: '위 자료와 출입·취급·근무의 가능 조합을 함께 대조하면 이 카드와 양립하는 조합이 없습니다.' });
     return reasons;
   }
-  return Object.freeze({ options: options, history: history, questionAllowed: questionAllowed, abilityAllowed: abilityAllowed, exclusionReasons: exclusionReasons });
+  return Object.freeze({ options: options, history: history, questionAllowed: questionAllowed, auditAllowed: auditAllowed, abilityAllowed: abilityAllowed, exclusionReasons: exclusionReasons });
 }));

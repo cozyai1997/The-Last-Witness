@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-17T12:36:44.972Z",
+  "recordedAt": "2026-10-17T16:37:25.497Z",
   "scope": "Independent controlled-race and projection review, not a penetration test",
   "storage": "Isolated in-memory test store; synthetic cases only",
   "productionRequests": 0,
   "runtimeFilesModified": false,
   "sourceSHA256": {
     "lib/passwords.cjs": "91cbebd77f19093a156a3e19683f13549659e4ac863dec81230c838a144d4f69",
-    "lib/game-service.cjs": "ce68a5d890429890c22caf714a58800991e505f8f3977197f9801686eacbc6a0",
+    "lib/game-service.cjs": "80903d8fd2496187524b99a765b813068590067b4ec2fe7a07d2cbddbd645781",
     "lib/party-engine.cjs": "b80c0598bee3a4897e7a14a3e1a006f7df127c3182746cfec0975188ef42cc56"
   },
   "passed": true,

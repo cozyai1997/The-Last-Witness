@@ -1,0 +1,77 @@
+{
+  "passed": true,
+  "checkedAt": "2026-10-17T16:41:47.486Z",
+  "detectiveVersion": 2,
+  "cases": 500,
+  "counts": [
+    {
+      "players": 2,
+      "cases": 100,
+      "detectiveWins": 98,
+      "questions": 460,
+      "unknownAnswers": 0,
+      "blockedQuestions": 12,
+      "verdicts": 181,
+      "initialMinPeople": 2,
+      "finalRemainingPeople": 105,
+      "averageFinalPeople": 1.05
+    },
+    {
+      "players": 3,
+      "cases": 100,
+      "detectiveWins": 74,
+      "questions": 559,
+      "unknownAnswers": 149,
+      "blockedQuestions": 51,
+      "verdicts": 185,
+      "initialMinPeople": 2,
+      "finalRemainingPeople": 147,
+      "averageFinalPeople": 1.47
+    },
+    {
+      "players": 4,
+      "cases": 100,
+      "detectiveWins": 75,
+      "questions": 609,
+      "unknownAnswers": 313,
+      "blockedQuestions": 59,
+      "verdicts": 172,
+      "initialMinPeople": 2,
+      "finalRemainingPeople": 170,
+      "averageFinalPeople": 1.7
+    },
+    {
+      "players": 5,
+      "cases": 100,
+      "detectiveWins": 77,
+      "questions": 568,
+      "unknownAnswers": 243,
+      "blockedQuestions": 45,
+      "verdicts": 187,
+      "initialMinPeople": 2,
+      "finalRemainingPeople": 152,
+      "averageFinalPeople": 1.52
+    },
+    {
+      "players": 6,
+      "cases": 100,
+      "detectiveWins": 78,
+      "questions": 584,
+      "unknownAnswers": 192,
+      "blockedQuestions": 91,
+      "verdicts": 183,
+      "initialMinPeople": 2,
+      "finalRemainingPeople": 164,
+      "averageFinalPeople": 1.64
+    }
+  ],
+  "totalSteps": 40930,
+  "truthChecks": 40430,
+  "categoryCoverage": 9,
+  "pairCoverage": 36,
+  "uniqueAtStart": 0,
+  "illegalActions": 0,
+  "deadlocks": 0,
+  "informationBoundary": "Each computer receives only its own privateView. No hidden crime is passed to the decision policy.",
+  "limitation": "Reference computer policy simulations do not measure human win rates, strategic balance, fun or fairness."
+}

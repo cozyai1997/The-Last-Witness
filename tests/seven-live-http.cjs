@@ -43,6 +43,7 @@ async function runSevenFlow(transport, options = {}) {
   for (const catalog of [E.SUSPECTS,E.PLACES,E.TOOLS,E.TIMES]) assert.equal(catalog.length, 12, 'The final release has twelve entries on every board');
   const timings = [], tokens = [], credentials = [], suffix = crypto.randomBytes(3).toString('hex');
   let latest = null, replayComparisons = 0, privateChecks = 0, reLogins = 0, pairedRouteChecks = 0, preparationChecks = 0, nonOwnerPreparations = 0, freeEventChecks = 0;
+  let detectiveVersion = null, starterChecks = 0, verdictChecks = 0, questionIndependenceChecks = 0, noSpendRejections = 0, memoryUnknownChecks = 0, criminalLieBudgetChecks = 0, criminalRefusalChecks = 0;
   const request = async (body, expected = 200) => {
     const start = Date.now(), response = await transport(body); timings.push(Date.now() - start);
     assert.equal(response.status, expected, body.op + ': unexpected status (' + (response.data?.code || 'OK') + ')');
@@ -74,6 +75,11 @@ async function runSevenFlow(transport, options = {}) {
   const poll = async i => (await request({ op: 'poll', token: tokens[i] })).room;
   const mutate = async (i, op, extra = {}) => (await request({ op, token: tokens[i], revision: latest?.revision, requestId: crypto.randomUUID(), ...extra })).room;
   const rejectAction = async (i, event, expected = 400) => request({ op: 'action', token: tokens[i], revision: latest.revision, requestId: crypto.randomUUID(), event }, expected);
+  const rejectUnchanged = async (i, event, expected = 400) => {
+    const before = await poll(i); await rejectAction(i, event, expected); const after = await poll(i);
+    assert.equal(after.revision, before.revision, 'Rejected actions cannot change the room revision');
+    assert.deepEqual(after.game, before.game, 'Rejected actions cannot spend a question, verdict or power'); noSpendRejections++;
+  };
   for (let i = 0; i < 7; i++) {
     credentials.push({ name: '칠일' + suffix + '-' + (i + 1), password: crypto.randomBytes(10).toString('base64url') });
     const registered = await request({ op: 'register', ...credentials[i], requestId: crypto.randomUUID() }); assert.equal(registered.room, null); tokens.push(registered.token);
@@ -105,12 +111,26 @@ async function runSevenFlow(transport, options = {}) {
     const ids = views.map(v => v.game.self.id), roles = views.map(v => v.game.self.role);
     assert.deepEqual(roles.slice().sort(), ['detective','culprit','witness','witness','suspect','accomplice'].sort());
     const D = roles.indexOf('detective'), C = roles.indexOf('culprit'), A = roles.indexOf('accomplice'), S = roles.indexOf('suspect');
+    const modern = views[D].game.detectiveVersion === 2;
+    detectiveVersion = modern ? 2 : 1;
     const secret = views[C].game.caseSecret;
     assert.equal(E.fitsReference(secret, views[C].game.fieldReference), true, 'The permitted criminal case fits a public paired route');
     assert.equal(views[C].game.self.identity.characterId, secret.suspectId, 'The actual criminal character owns the case truth');
     assert.equal(views[S].game.self.identity.candidates.length, 3); assert.equal(views[S].game.self.identity.known, false);
-    assert.equal(views[D].game.self.clues.filter(c => E.CATEGORIES.find(x => x.id === c.category).group === 'person').length, 1);
-    assert.equal(views[D].game.self.clues.filter(c => E.CATEGORIES.find(x => x.id === c.category).group === 'place').length, 1);
+    if (modern) {
+      const detective = views[D].game, clues = detective.self.clues, candidates = E.candidates(detective);
+      assert.equal(detective.kits, 2, 'Each new case starts with two shared verdicts');
+      assert.equal(clues.length, 2); assert.equal(new Set(clues.map(clue => clue.category)).size, 2);
+      assert.ok(clues.every(clue => E.CATEGORIES.some(category => category.id === clue.category) && clue.value === E.caseValue(secret, clue.category)));
+      assert.ok(new Set(candidates.map(candidate => candidate.suspectId)).size >= 2, 'Starting answers and the detective innocence cannot identify one culprit');
+      assert.ok(candidates.some(candidate => candidate.suspectId === secret.suspectId), 'Starting knowledge preserves the real culprit');
+      const targets = detective.players.filter(player => !player.isDetective);
+      assert.equal(targets.length, 5); assert.ok(targets.some(player => player.id === ids[S]), 'The anonymous suspect remains in the same target roster');
+      assert.ok(Actions.options(detective).records.every(record => !record.available)); starterChecks++;
+    } else {
+      assert.equal(views[D].game.self.clues.filter(c => E.CATEGORIES.find(x => x.id === c.category).group === 'person').length, 1);
+      assert.equal(views[D].game.self.clues.filter(c => E.CATEGORIES.find(x => x.id === c.category).group === 'place').length, 1);
+    }
     const owner = () => ids.indexOf(latest.game.turnOwnerId);
     const ownerAction = event => { const i = owner(); assert.ok(i >= 0); return mutate(i, 'action', { event }); };
     if (scenario.extended) {
@@ -132,7 +152,7 @@ async function runSevenFlow(transport, options = {}) {
       assert.deepEqual(latest.game.facts, before.facts); assert.deepEqual(latest.game.statements, before.statements);
       assert.equal((await poll(W)).game.self.identityGuess, undefined);
     }
-    let ownCharacter = null;
+    let ownCharacter = null, firstFalseStatement = null, falseAnswers = 0;
     for (let round = 1; round <= 7; round++) {
       assert.equal(latest.game.round, round); let sPassed = false;
       while (latest.game.phase === 'secret') {
@@ -147,6 +167,12 @@ async function runSevenFlow(transport, options = {}) {
         else if (scenario.extended && i === C && round === 1) event = { type: 'SECRET_ACTION', kind: 'seal', category: 'gender' };
         else if (scenario.extended && i === C && round === 2) event = { type: 'SECRET_ACTION', kind: 'seal', category: 'hand' };
         else if (scenario.extended && i === A && round === 3) event = { type: 'SECRET_ACTION', kind: 'seal', category: 'work' };
+        if (modern && event.kind === 'seal') {
+          const actor = (await poll(i)).game, detective = (await poll(D)).game, questions = Actions.options(detective).questions;
+          const permitted = Actions.options(actor).abilities.filter(ability => ability.available && (!questions.length || questions.some(question => question.id !== ability.id)));
+          const category = permitted.find(ability => ability.id === event.category) || permitted[0];
+          event = category ? { ...event, category: category.id } : { type: 'SECRET_ACTION', kind: 'ready' };
+        }
         if (i === S && scenario.deadline && round === 7) { await rejectAction(S, { type: 'SECRET_ACTION', kind: 'report', suspectId: secret.suspectId, text: '마감 뒤 제보' }); }
         if (i === S && round > scenario.reportDay && scenario.reportDay !== null) await rejectAction(S, { type: 'SECRET_ACTION', kind: 'report', suspectId: secret.suspectId, text: '바꿀 수 없는 두 번째 제보' });
         if (simultaneous && ids[i] !== latest.game.turnOwnerId) nonOwnerPreparations++;
@@ -157,27 +183,90 @@ async function runSevenFlow(transport, options = {}) {
           if (round === 1) { assert.equal(own.self.identity.known, false); assert.equal(own.self.identity.characterId, undefined); }
           else { ownCharacter = own.self.identity.characterId; assert.equal(own.self.identity.known, true); assert.ok(ownCharacter); }
           if (round === scenario.reportDay) { assert.equal(own.self.sealedReport.suspectId, secret.suspectId); assert.equal(own.self.sealedReport.round, round); assert.equal(own.self.sealedReport.correct, undefined); assert.equal(own.self.sealedReport.isCorrect, undefined); }
-          if (scenario.deadline && round === 6) await rejectAction(S, { type: 'SECRET_ACTION', kind: 'report', suspectId: secret.suspectId, text: '오늘 준비를 마친 뒤 보낸 제보' }, simultaneous ? 400 : 403);
+          if (scenario.deadline && round === 6) await rejectAction(S, { type: 'SECRET_ACTION', kind: 'report', suspectId: secret.suspectId, text: '오늘 준비를 마친 뒤 보낸 제보' }, simultaneous && own.phase === 'secret' ? 400 : 403);
         }
       }
       assert.equal(sPassed, true); assert.equal(latest.game.phase, 'investigate');
       await rejectAction(D, { type: 'ACCUSE', suspectId: secret.suspectId });
+      if (modern && scenario.extended) {
+        await rejectUnchanged(D, { type: 'SEARCH', recordId: round % 2 ? 'portrait' : 'tool' });
+        await rejectUnchanged(D, { type: 'INVESTIGATE', kind: 'search', recordId: 'time' });
+        if (round === 2) {
+          const before = (await poll(D)).game, criminalBefore = (await poll(C)).game;
+          assert.ok(Actions.auditAllowed(before, firstFalseStatement.id), 'The earlier independent claim remains unresolved');
+          await mutate(D, 'action', { event: { type: 'AUDIT', statementId: firstFalseStatement.id } });
+          const after = (await poll(D)).game, criminalAfter = (await poll(C)).game;
+          assert.equal(after.phase, 'investigate'); assert.equal(after.round, round); assert.equal(after.kits, 1);
+          assert.equal(after.turnOwnerId, before.turnOwnerId); assert.deepEqual(after.questionHistory, before.questionHistory);
+          assert.deepEqual(after.pending, before.pending); assert.deepEqual(after.review, before.review);
+          const verdict = after.statements.find(statement => statement.id === firstFalseStatement.id);
+          assert.equal(verdict.isTrue, false); assert.equal(verdict.actualValue, undefined);
+          assert.deepEqual(criminalAfter.self.sealOutcomes, criminalBefore.self.sealOutcomes, 'A verdict before the daily question cannot resolve today seals');
+          assert.equal(Actions.auditAllowed(after, firstFalseStatement.id), false);
+          await rejectUnchanged(D, { type: 'AUDIT', statementId: firstFalseStatement.id });
+          verdictChecks++; questionIndependenceChecks++;
+        }
+      }
       if (scenario.extended && round <= 4) {
         const target = round === 2 ? A : C;
         const detective = (await poll(D)).game, choices = Actions.options(detective).questions;
-        const question = choices.find(choice => choice.id === 'tool') || choices.find(choice => ['time','cctv','zone','entry'].includes(choice.id));
-        assert.ok(question, 'The integration policy needs an unresolved official question');
-        await mutate(D, 'action', { event: { type: 'QUESTION', targetId: ids[target], category: question.id, proposedValue: question.proposedValues[0] } }); assert.equal(latest.game.phase, 'answer');
-        if (round === 1) await mutate(S, 'action', { event: { type: 'ADD_NOTE', text: '답변 대기 중에도 대화' } });
-        const value = round === 3 ? null : round <= 2 ? (E.caseValue(secret, question.id) + 1) % E.CATEGORIES.find(category => category.id === question.id).values.length : E.caseValue(secret, question.id);
-        await mutate(target, 'action', { event: { type: 'ANSWER', value } });
-        if (round === 2) { assert.equal((await poll(C)).game.remainingLies, 0); }
-        if (round === 3) { assert.equal((await poll(A)).game.remainingRefusals, 0); }
-        if (round === 4) {
-          const statement = latest.game.statements.at(-1); await mutate(D, 'action', { event: { type: 'REVIEW_AUDIT' } }); assert.equal(latest.game.kits, 0); assert.equal(latest.game.review.isTrue, true); assert.equal(latest.game.review.actualValue, undefined); assert.equal(latest.game.statements.at(-1).value, statement.value);
+        const criminal = modern ? (await poll(C)).game : null;
+        const unsealed = choice => !modern || !(criminal.seals || []).some(seal => seal.category === choice.id);
+        let question, value;
+        if (modern && round <= 2) {
+          // Choose an actually unresolved false proposition from permitted
+          // detective options; a random false answer may already be disproved.
+          for (const choice of choices.filter(unsealed).sort((a, b) => b.proposedValues.length - a.proposedValues.length)) {
+            const falseValue = choice.proposedValues.find(proposed => {
+              if (proposed === E.caseValue(secret, choice.id)) return false;
+              const statement = { id: 'policy-candidate', round, speakerId: ids[target], category: choice.id, value: proposed, audited: false };
+              return Actions.auditAllowed({ ...detective, statements: [...detective.statements, statement] }, statement.id);
+            });
+            if (falseValue !== undefined) { question = choice; value = falseValue; break; }
+          }
+        } else {
+          question = choices.filter(unsealed).find(choice => choice.id === 'tool') || choices.filter(unsealed).find(choice => ['time','camera','zone','entry'].includes(choice.id)) || (modern && choices.filter(unsealed)[0]);
+          value = question && (round === 3 ? null : round <= 2 ? (E.caseValue(secret, question.id) + 1) % E.CATEGORIES.find(category => category.id === question.id).values.length : E.caseValue(secret, question.id));
         }
-      } else if (scenario.extended && round === 5) await mutate(D, 'action', { event: { type: 'SEARCH', recordId: 'portrait' } });
-      else if (scenario.extended && round === 6) await mutate(D, 'action', { event: { type: 'SEARCH', recordId: 'tool' } });
+        if (!question && modern) {
+          // New starter pairs can combine with the first verdict to resolve
+          // every remaining category. Passing is the valid daily completion.
+          await mutate(D, 'action', { event: { type: 'INVESTIGATE', kind: 'pass' } });
+        } else {
+          assert.ok(question, 'The integration policy needs an unresolved official question');
+          const event = { type: 'QUESTION', targetId: ids[target], category: question.id, proposedValue: question.proposedValues[0] };
+          await mutate(D, 'action', { event }); assert.equal(latest.game.phase, 'answer');
+          if (round === 1) await mutate(S, 'action', { event: { type: 'ADD_NOTE', text: '답변 대기 중에도 대화' } });
+          if (modern && round === 2) await rejectUnchanged(D, { type: 'AUDIT', statementId: firstFalseStatement.id }, 403);
+          await mutate(target, 'action', { event: { type: 'ANSWER', value } });
+          if (round <= 2) { falseAnswers++; assert.equal((await poll(C)).game.remainingLies, 2 - falseAnswers); criminalLieBudgetChecks++; }
+          if (modern) await rejectUnchanged(D, event);
+          if (round === 3) { assert.equal((await poll(A)).game.remainingRefusals, 0); criminalRefusalChecks++; }
+          if (modern && round === 1) firstFalseStatement = latest.game.statements.at(-1);
+          if (modern && round === 2 || !modern && round === 4) {
+            const statement = latest.game.statements.at(-1), before = (await poll(D)).game;
+            if (modern) assert.ok(Actions.options(before).audits.some(entry => entry.id === statement.id));
+            await mutate(D, 'action', { event: { type: 'REVIEW_AUDIT' } }); assert.equal(latest.game.kits, 0); assert.equal(latest.game.review.isTrue, !modern); assert.equal(latest.game.review.actualValue, undefined); assert.equal(latest.game.statements.at(-1).value, statement.value);
+            if (modern) { verdictChecks++; await rejectUnchanged(D, { type: 'REVIEW_AUDIT' }); }
+          }
+        }
+      } else if (modern && scenario.extended && (round === 5 || round === 6)) {
+        const detective = (await poll(D)).game, criminal = (await poll(C)).game;
+        const question = Actions.options(detective).questions.find(choice => !(criminal.seals || []).some(seal => seal.category === choice.id));
+        if (question) {
+          const before = { lies: criminal.remainingLies, refusals: criminal.remainingRefusals, statements: detective.statements.length };
+          const event = { type: 'QUESTION', targetId: ids[S], category: question.id, proposedValue: question.proposedValues[0] };
+          await mutate(D, 'action', { event }); assert.equal(latest.game.phase, 'answer');
+          const suspect = (await poll(S)).game; assert.deepEqual(suspect.self.answerOptions.legalValues, [null], 'The suspect always receives only memory-unknown as an official answer');
+          await rejectUnchanged(S, { type: 'ANSWER', value: E.caseValue(secret, question.id) });
+          await mutate(S, 'action', { event: { type: 'ANSWER', value: null } });
+          const after = (await poll(C)).game;
+          assert.equal(after.review.value, null); assert.equal(after.statements.length, before.statements);
+          assert.equal(after.remainingLies, before.lies); assert.equal(after.remainingRefusals, before.refusals);
+          await rejectUnchanged(D, event); memoryUnknownChecks++;
+        } else await mutate(D, 'action', { event: { type: 'INVESTIGATE', kind: 'pass' } });
+      } else if (!modern && scenario.extended && round === 5) await mutate(D, 'action', { event: { type: 'SEARCH', recordId: 'portrait' } });
+      else if (!modern && scenario.extended && round === 6) await mutate(D, 'action', { event: { type: 'SEARCH', recordId: 'tool' } });
       else await mutate(D, 'action', { event: { type: 'INVESTIGATE', kind: 'pass' } });
       assert.equal(latest.game.phase, 'discussion');
       const outsiders = [D,C,A].filter(i => i !== S);
@@ -200,13 +289,14 @@ async function runSevenFlow(transport, options = {}) {
     assert.equal(reveal.suspectResult.status, scenario.wantS); assert.equal(reveal.suspectResult.earlyTracking, scenario.wantS === 'win' && scenario.reportDay <= 4);
     assert.equal(reveal.replay.version, 2); assert.equal(reveal.replay.complete, true); assert.equal(reveal.replay.source, 'recorded'); assert.equal(reveal.replay.events.filter(e => e.type === 'round-confirm').length, 7);
     for (let i = 0; i < 6; i++) { const final = await poll(i); assert.deepEqual(final.game.reveal.replay, reveal.replay); replayComparisons++; }
-    caseResults.push({ scenario: scenario.id, days: 7, team: scenario.wantTeam, suspect: scenario.wantS, replayIdentical: true });
+    if (modern && scenario.extended) assert.equal(reveal.replay.events.filter(event => event.type === 'audit').length, verdictChecks);
+    caseResults.push({ scenario: scenario.id, detectiveVersion: modern ? 2 : 1, days: 7, team: scenario.wantTeam, suspect: scenario.wantS, replayIdentical: true });
     room = await mutate(0, 'restart'); assert.equal(room.status, 'lobby'); assert.equal(room.game, null); assert.equal(room.caseId, undefined); assert.ok(room.members.every(m => !m.ready && !m.gameId));
     options.onProgress?.({ completedCases: caseResults.length, totalCases: cases.length, scenario: scenario.id, requests: timings.length });
   }
   for (let i = 0; i < 6; i++) { await poll(i); await mutate(i, 'leave'); }
   assert.equal(await poll(0), null);
-  return { passed: true, checkedAt: new Date().toISOString(), rulesVersion: 4, finalInput: 'person-only', catalog: { people: E.SUSPECTS.length, places: E.PLACES.length, tools: E.TOOLS.length, times: E.TIMES.length }, pairedRoutes: true, fieldReferenceVersion: 2, pairedRouteChecks, preparationChecks, nonOwnerPreparations, freeEventChecks, simultaneousPreparation: nonOwnerPreparations > 0, sessions: 7, simultaneousPlayers: 6, cases: caseResults, requests: timings.length, maxRequestMs: Math.max(...timings), averageRequestMs: Math.round(timings.reduce((a,b) => a+b,0)/timings.length), privateChecks, replayComparisons, reLogins, memory: '3-2-1', sealedReportPrivacy: true, reportOnce: true, day6OwnTurnDeadline: true, earlyAccusationBlocked: true, accountResume: true, oldTokenRevoked: true, actorBoundToSession: true, actualCCharacter: true, dualSuccess: true, selfAccusationPriority: true, neutralNoReport: true, sharedLiesAndRefusal: true, auditVerdictOnly: true, restart: true, credentialsSaved: false };
+  return { passed: true, checkedAt: new Date().toISOString(), rulesVersion: 4, detectiveVersion, starterChecks, verdictChecks, questionIndependenceChecks, noSpendRejections, memoryUnknownChecks, criminalLieBudgetChecks, criminalRefusalChecks, finalInput: 'person-only', catalog: { people: E.SUSPECTS.length, places: E.PLACES.length, tools: E.TOOLS.length, times: E.TIMES.length }, pairedRoutes: true, fieldReferenceVersion: 2, pairedRouteChecks, preparationChecks, nonOwnerPreparations, freeEventChecks, simultaneousPreparation: nonOwnerPreparations > 0, sessions: 7, simultaneousPlayers: 6, cases: caseResults, requests: timings.length, maxRequestMs: Math.max(...timings), averageRequestMs: Math.round(timings.reduce((a,b) => a+b,0)/timings.length), privateChecks, replayComparisons, reLogins, memory: '3-2-1', sealedReportPrivacy: true, reportOnce: true, day6OwnTurnDeadline: true, earlyAccusationBlocked: true, accountResume: true, oldTokenRevoked: true, actorBoundToSession: true, actualCCharacter: true, dualSuccess: true, selfAccusationPriority: true, neutralNoReport: true, sharedLiesAndRefusal: criminalLieBudgetChecks > 0 && criminalRefusalChecks > 0, auditVerdictOnly: true, restart: true, credentialsSaved: false };
 }
 module.exports = { runSevenFlow, assertPairedRoutes };
 if (require.main === module) {

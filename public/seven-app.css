@@ -159,3 +159,31 @@
   .seven-private-compact .seven-answer-options{grid-template-columns:repeat(4,minmax(0,1fr));margin:5px 0;gap:4px}
   .seven-private-compact .seven-answer-options .btn{font-size:8px;padding:4px 3px;min-height:44px;line-height:1.3}
 }
+.seven-verdict-panel{margin-top:18px;padding-top:18px;border-top:1px solid var(--line,#d5c7ad)}
+.seven-verdict-panel h3 small{display:block;margin-top:6px;font-size:.76rem;font-weight:500}
+.seven-actions-v2>.seven-verdict-panel{margin:0;padding:0;border:0}
+.seven-verdict-scroll{max-height:280px;overflow:auto;scrollbar-width:thin;overscroll-behavior:contain}
+.seven-review-verdicts>summary{cursor:pointer;min-height:44px;display:list-item;align-content:center;color:#d6c39c;font-size:11px;line-height:1.5}
+.seven-review-verdicts .seven-verdict-scroll{max-height:180px}
+@media(max-width:580px){
+  .seven-private-compact .seven-actions-v2>.seven-verdict-panel>h3{font-size:12px;margin:0;line-height:1.5}
+  .seven-private-compact .seven-actions-v2 .seven-verdict-scroll{max-height:calc(100dvh - 390px);min-height:90px}
+  .seven-private-compact .seven-actions-v2 .seven-audit-options{max-height:none;overflow:visible;min-height:0}
+  .seven-private-compact .seven-actions-v2 .seven-audit-options .seven-action-card{grid-template-columns:minmax(0,1fr) 108px;gap:3px 8px}
+  .seven-private-compact .seven-actions-v2 .seven-action-card>small{grid-column:1;grid-row:1;font-size:8px}
+  .seven-private-compact .seven-actions-v2 .seven-action-card>p{grid-column:1;grid-row:2}
+  .seven-private-compact .seven-actions-v2 .seven-action-card>.btn{grid-column:2;grid-row:1/3}
+  .seven-private-compact .seven-actions-v2 .seven-verdict-scroll>.record-card{margin:6px 0;padding:8px}
+  .seven-private-compact .seven-actions-v2 .seven-verdict-scroll>.record-card p{font-size:10px;margin:5px 0}
+  .seven-review-v2{padding:12px}
+  .seven-review-v2>h3{font-size:20px;margin:9px 0}
+  .seven-review-v2>.seven-hand{font-size:19px!important;line-height:1.55!important;min-height:0;margin:10px 0}
+  .seven-review-v2>p{margin:8px 0;font-size:10px;line-height:1.5}
+  .seven-review-v2>.seven-verdict{padding:10px;margin:10px 0}
+  .seven-review-v2>.seven-verdict-panel{margin:8px 0 0;padding:0;border-top-color:#716548}
+  .seven-review-v2 .seven-verdict-scroll{max-height:150px}
+  .seven-review-v2 .seven-verdict-scroll .seven-action-card{padding:9px;margin:6px 0}
+  .seven-review-v2 .seven-verdict-scroll .btn{min-height:44px}
+  .seven-review-v2>.case-review-actions{padding-top:10px;margin-top:10px;gap:6px}
+  .seven-review-v2>.case-review-actions>.btn{min-height:44px;padding:7px;font-size:10px}
+}

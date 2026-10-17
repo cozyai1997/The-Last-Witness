@@ -18,6 +18,8 @@
     const pick = values => values[Math.floor(random() * values.length)];
     const pool = () => optionsFor(E, view);
     const A = root.WitnessSevenActions || E.actions, menu = A?.options(view);
+    const detectiveV2 = view.detectiveVersion === 2;
+    const audits = detectiveV2 ? (menu?.audits || []).filter(s => A?.auditAllowed?.(view, s.id)) : [];
     const publicView = { ...view }; delete publicView.self; delete publicView.caseSecret; delete publicView.seals;
     const openAbilities = A ? E.CATEGORIES.filter(c => A.abilityAllowed(publicView, c.id)) : E.CATEGORIES.filter(c => knownValue({ ...view, self: { clues: [] } }, c.id) === null);
     const category = openAbilities[0]?.id || E.CATEGORIES[0].id;
@@ -43,24 +45,27 @@
     }
     if (view.phase === 'investigate') {
       const available = E.RECORDS.filter(r => !view.facts.some(f => f.source === 'record' && f.recordId === r.id));
-      if (available.length && (view.round % 2 === 0 || view.round === 7)) { const record = pick(available); memory.records.push(record.id); return { type: 'SEARCH', recordId: record.id }; }
+      if (!detectiveV2 && available.length && (view.round % 2 === 0 || view.round === 7)) { const record = pick(available); memory.records.push(record.id); return { type: 'SEARCH', recordId: record.id }; }
+      if (detectiveV2 && view.kits > 0 && audits.length && view.round >= 4) return { type: 'AUDIT', statementId: pick(audits).id };
       const offers = (view.suggestions || []).filter(o => o.kind === 'testimony' && o.speakerId !== view.self.id && (A ? A.questionAllowed(view, o.category, o.value) : knownValue(view, o.category) === null) && !view.questionHistory?.some(q => q.targetId === o.speakerId && q.category === o.category && q.status === 'answered'));
       if (offers.length) { const offer = pick(offers); return { type: 'QUESTION', targetId: offer.speakerId, category: offer.category, proposedValue: offer.value }; }
       const categories = E.CATEGORIES.filter(c => menu ? menu.questions.some(q => q.id === c.id) : knownValue(view, c.id) === null);
       const pairs = categories.flatMap(c => view.players.filter(p => p.id !== view.self.id).map(p => ({ category: c.id, targetId: p.id }))).filter(q => !memory.questions.includes(q.targetId + ':' + q.category));
-      if (!pairs.length) { if (available.length) return { type: 'SEARCH', recordId: pick(available).id }; return { type: 'INVESTIGATE', kind: 'pass' }; }
+      if (!pairs.length) { if (!detectiveV2 && available.length) return { type: 'SEARCH', recordId: pick(available).id }; return { type: 'INVESTIGATE', kind: 'pass' }; }
       const question = pick(pairs); memory.questions.push(question.targetId + ':' + question.category);
       const proposedValue = menu?.questions.find(q => q.id === question.category)?.proposedValues?.[0] ?? 0;
       return { type: 'QUESTION', ...question, proposedValue };
     }
     if (view.phase === 'answer') {
+      if (detectiveV2 && view.self.role === 'suspect') return { type: 'ANSWER', value: null };
       if (!view.caseSecret) return { type: 'ANSWER', value: view.self.answerOptions?.legalValues?.[0] ?? knownValue(view, view.pending.category) };
       const actual = E.caseValue(view.caseSecret, view.pending.category), values = E.CATEGORIES.find(c => c.id === view.pending.category).values;
       if (view.remainingLies > 0 && random() < .4) return { type: 'ANSWER', value: (actual + 1) % values.length };
       return { type: 'ANSWER', value: actual };
     }
     if (view.phase === 'discussion') {
-      if (view.review?.kind === 'answer' && !view.review.verified && view.review.statementId && view.kits > 0 && view.round >= 4) return { type: 'REVIEW_AUDIT' };
+      if (view.review?.kind === 'answer' && !view.review.verified && view.review.statementId && view.kits > 0 && view.round >= 4 && (!detectiveV2 || audits.some(s => s.id === view.review.statementId))) return { type: 'REVIEW_AUDIT' };
+      if (detectiveV2 && view.kits > 0 && audits.length && view.round >= 4) return { type: 'AUDIT', statementId: pick(audits).id };
       return { type: 'ROUND_CONFIRM' };
     }
     if (view.phase === 'final') { const candidates = pool(); const candidate = candidates.length ? pick(candidates) : { suspectId: pick(E.SUSPECTS).id }; return { type: 'ACCUSE', suspectId: candidate.suspectId }; }
@@ -134,10 +139,10 @@
       const E = await loadEngine(); if (generation !== stamp) return response();
       if (role !== 'random' && !E.ROLE_PACKS[count].includes(role)) throw failure('이 인원 구성에 포함된 역할을 선택해 주세요.');
       const names = Array.from({ length: count }, (_, i) => '컴퓨터 ' + (i + 1));
-      const initial = E.makeGame(names, { seed });
+      const initial = E.makeGame(names, { seed, detectiveVersion: 2 });
       const publicPlayers = E.publicView(initial).players;
       const humanIndex = role === 'random' ? 0 : publicPlayers.findIndex(p => E.privateView(initial, p.id).self.role === role);
-      names[humanIndex] = name; const state = E.makeGame(names, { seed }); if (generation !== stamp) return response();
+      names[humanIndex] = name; const state = E.makeGame(names, { seed, detectiveVersion: 2 }); if (generation !== stamp) return response();
       match = { E, state, humanId: publicPlayers[humanIndex].id, options: { count, role, name, rulesVersion: 4 }, caseId: 'practice-' + (root.crypto?.randomUUID?.() || Date.now().toString(36) + '-' + Math.random().toString(36).slice(2)), onChange: typeof options.onChange === 'function' ? options.onChange : null, random: randomFor(seed ^ 0x719A), memory: Object.fromEntries(publicPlayers.map(p => [p.id, { records: [], questions: [] }])), receipts: new Map() };
       revision++; const data = notify(); schedule(); return data;
     }

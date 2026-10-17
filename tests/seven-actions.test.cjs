@@ -5,6 +5,47 @@ const D = require('../public/seven-data.js');
 const A = require('../public/seven-actions.js');
 const view = () => ({ facts: [], statements: [], questionHistory: [], self: { clues: [] } });
 
+test('verdict options exclude starting answers and equivalent already proved claims', () => {
+  const g = view(); g.detectiveVersion = 2; g.kits = 2;
+  g.self.clues.push({ category: 'gender', value: 0 });
+  g.statements.push(
+    { id: 'initial', category: 'gender', value: 1, audited: false },
+    { id: 'checked', category: 'tool', value: 2, audited: true, isTrue: false },
+    { id: 'repeat', category: 'tool', value: 2, audited: false },
+    { id: 'open', category: 'tool', value: 3, audited: false },
+    { id: 'unknown', category: 'time', value: null, audited: false }
+  );
+  assert.deepEqual(A.options(g).audits.map(s => s.id), ['open']);
+  assert.equal(A.auditAllowed(g, 'initial'), false);
+  assert.equal(A.auditAllowed(g, 'repeat'), false);
+  assert.equal(A.auditAllowed(g, 'open'), true);
+  assert.equal(A.auditAllowed(g, 'unknown'), false);
+  assert.equal(A.auditAllowed(g, 'missing'), false);
+  g.caseSecret = { toolId: 'do-not-read' }; g.seals = [{ category: 'tool' }];
+  assert.equal(A.auditAllowed(g, 'open'), true);
+  g.kits = 0;
+  assert.deepEqual(A.options(g).audits, []);
+});
+
+test('verdict filters use partial evidence and reject truth already implied by connected records', () => {
+  const g = view(); g.detectiveVersion = 2; g.kits = 2;
+  g.facts.push({ category: 'tool', source: 'record', allowedValues: [1, 3] });
+  g.statements.push({ id: 'excluded', category: 'tool', value: 2, audited: false }, { id: 'possible', category: 'tool', value: 1, audited: false });
+  assert.equal(A.auditAllowed(g, 'excluded'), false);
+  assert.equal(A.auditAllowed(g, 'possible'), true);
+  g.statements.push({ id: 'false-three', category: 'tool', value: 3, audited: true, isTrue: false });
+  assert.equal(A.auditAllowed(g, 'possible'), false);
+  assert.deepEqual(A.options(g).audits, []);
+});
+
+test('new detective has no search ability while previous detective record options remain unchanged', () => {
+  const g = view();
+  assert.ok(A.options(g).records.some(r => r.available));
+  g.detectiveVersion = 2;
+  assert.ok(A.options(g).records.every(r => r.available === false));
+  assert.equal(A.questionAllowed(g, 'gender', 0), true);
+});
+
 test('questions combine personal knowledge, certified ranges and false audits', () => {
   const g = view();
   g.self.clues.push({ category: 'gender', value: 0 });
