@@ -36,7 +36,7 @@
     const read = id => config.read ? config.read(id) : typeof document !== 'undefined' ? document.getElementById(id)?.value || '' : '';
     const disabled = (value, action) => value || serverActions.has(action) && pending() ? ' disabled' : '';
     // Reading and local navigation remain usable while the preceding request settles.
-    const button = (action, text, extra, off) => '<button class="btn compact ' + (extra?.includes('data-danger') ? 'danger' : 'outline') + '" data-action="seven-' + action + '"' + (extra || '') + (serverActions.has(action) && !extra?.includes('data-mutate') ? ' data-mutate' : '') + disabled(off, action) + '>' + text + '</button>';
+    const button = (action, text, extra, off) => '<button class="btn compact ' + (extra?.includes('data-danger') ? 'danger' : 'outline') + '" data-action="seven-' + action + '"' + (extra || '') + disabled(off, action) + '>' + text + '</button>';
     const field = (id, label, entries, selected) => '<label class="field"><span>' + esc(label) + '</span><select id="' + id + '" data-draft="' + id + '">' + entries.map(p => '<option value="' + esc(p.id) + '"' + (String(p.id) === String(drafts[id] ?? selected) ? ' selected' : '') + '>' + esc(p.label || p.name) + '</option>').join('') + '</select></label>';
     function catText(id, value) { const c = category(id); return c ? c.label + ' · ' + (c.values[value] ?? '미확인') : '미기록 관찰'; }
     function truth(g, id) {
