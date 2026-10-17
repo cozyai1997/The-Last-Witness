@@ -1,0 +1,35 @@
+{
+  "base": "https://the-last-witness-pi.vercel.app",
+  "commit": "dd63883b5bd9abc9e7a7063598cd7ebf9af2c52d",
+  "staticMatches": {
+    "online-app.js": true,
+    "catalog.js": true,
+    "online.css": true,
+    "bgm.js": true,
+    "index.html": true
+  },
+  "audio": {
+    "witness-noir-loop.mp3": {
+      "status": 200,
+      "bytes": 1281166,
+      "sha256": "a2e2e12369d503567e53b53e1d7ed31a1529494bf85c75d7027218346a47d661",
+      "type": "audio/mpeg"
+    },
+    "witness-noir-loop.ogg": {
+      "status": 200,
+      "bytes": 950865,
+      "sha256": "be7988472137eff86b9db5bfcc81f29ac524ef830d601947408329e0dd35e9c3",
+      "type": "audio/ogg"
+    }
+  },
+  "privatePaths": {
+    "/lib/party-engine.cjs": 404,
+    "/lib/passwords.cjs": 404,
+    "/scripts/storage.sql": 404,
+    "/.env": 404,
+    "/api/room": 405
+  },
+  "homepageStatus": 200,
+  "securityHeaders": true,
+  "checkedAt": "2026-10-17T07:00:25.336Z"
+}

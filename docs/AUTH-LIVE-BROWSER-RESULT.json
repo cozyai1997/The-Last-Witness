@@ -1,0 +1,24 @@
+{
+  "base": "https://the-last-witness-pi.vercel.app",
+  "commit": "dd63883b5bd9abc9e7a7063598cd7ebf9af2c52d",
+  "actualTabClosed": true,
+  "sameRoom": true,
+  "sameRole": true,
+  "sameRound": true,
+  "sameTurn": true,
+  "privatePanelMaskedInitially": true,
+  "newTabMusicPaused": true,
+  "playedAudio": {
+    "initialized": true,
+    "playing": true,
+    "loading": false,
+    "volume": 0.25,
+    "muted": false,
+    "hidden": false,
+    "duration": 64,
+    "currentTime": 21.604522,
+    "source": "https://the-last-witness-pi.vercel.app/audio/witness-noir-loop.mp3",
+    "error": ""
+  },
+  "checkedAt": "2026-10-17T07:00:42.755Z"
+}

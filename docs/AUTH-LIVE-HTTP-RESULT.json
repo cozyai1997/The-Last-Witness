@@ -1,0 +1,22 @@
+{
+  "base": "https://the-last-witness-pi.vercel.app",
+  "passed": true,
+  "sessions": 7,
+  "simultaneousPlayers": 6,
+  "rounds": 5,
+  "serverRequests": 308,
+  "maxRequestMs": 4681,
+  "averageRequestMs": 515,
+  "privacy": true,
+  "capacityRace": true,
+  "protectedEvidence": true,
+  "sharedLieBudget": true,
+  "guardAndSeal": true,
+  "reconnect": true,
+  "passwordReLogin": true,
+  "logoutPreservesSeat": true,
+  "restart": true,
+  "testedCommit": "dd63883b5bd9abc9e7a7063598cd7ebf9af2c52d",
+  "deploymentId": "dpl_FLuEqdCUgFJoDUMHH5roo5iWj9jT",
+  "verifiedAtUtc": "2026-10-17T07:02:46.9603357Z"
+}
