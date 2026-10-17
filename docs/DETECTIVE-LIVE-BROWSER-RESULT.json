@@ -1,0 +1,11 @@
+{
+  "base": "https://the-last-witness-pi.vercel.app",
+  "testedCommit": "5ad811125c10f3c6c86cb786448bbcf199aa0071",
+  "existingRoleRestored": true,
+  "dayRestored": 4,
+  "personAndSceneHintsVisible": true,
+  "completedBlockedAndKnownCategoriesOmitted": true,
+  "exhaustedQuestionDisabled": true,
+  "consoleWarningsOrErrors": 0,
+  "checkedAt": "2026-10-17T08:50:51.495Z"
+}

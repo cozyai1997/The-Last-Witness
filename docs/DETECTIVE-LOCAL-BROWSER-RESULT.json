@@ -1,0 +1,38 @@
+{
+  "base": "http://127.0.0.1:4184",
+  "featureCommit": "5ad811125c10f3c6c86cb786448bbcf199aa0071",
+  "realAuthenticatedRoom": true,
+  "verifiedLieRedBorder": true,
+  "redBorderColor": "rgb(228, 89, 79)",
+  "unverifiedNotRed": true,
+  "kitSpentOnce": true,
+  "initialPersonAndSceneHints": true,
+  "knownAndCompletedQuestionFilter": true,
+  "filteredQuestionIdsAfterRoundOne": [
+    "item",
+    "zone"
+  ],
+  "filteredQuestionIdsAfterRoundTwo": [
+    "zone"
+  ],
+  "matchingAssumptions": true,
+  "culpritOnlyFailedSealNotice": true,
+  "detectiveNoFailureNotice": true,
+  "blockedReviewTypingGate": true,
+  "consoleWarningsOrErrors": 0,
+  "checkedAt": "2026-10-17T08:49:11.568Z",
+  "blockedCategoryOmittedNextRound": true,
+  "emptyQuestionFormDisabled": true,
+  "finalOptionsFiltered": true,
+  "manualExclusionsApplied": true,
+  "finalRemaining": {
+    "suspects": [
+      "s0"
+    ],
+    "places": [
+      "p1"
+    ]
+  },
+  "culpritSuccessNotice": true,
+  "roundFourAutomaticAfterNotice": true
+}
