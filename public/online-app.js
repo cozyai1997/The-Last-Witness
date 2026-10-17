@@ -16,8 +16,9 @@
     question: '<path d="M8 8a4 4 0 1 1 6 3c-2 1-2 2-2 4m0 3v1"/><circle cx="12" cy="12" r="10"/>',
     copy: '<rect x="8" y="8" width="12" height="13" rx="1"/><path d="M16 8V3H3v13h5"/>'
   };
-  let token = sessionGet(TOKEN_KEY), nickname = sessionGet(NAME_KEY) || '';
-  let room = null, capacity = 4, ready = false, restoring = !!token, pending = false;
+  let token = sessionGet(TOKEN_KEY), nickname = sessionGet(NAME_KEY) || rememberedName();
+  let room = null, account = null, capacity = 4, ready = false, restoring = !!token, pending = false;
+  let authMode = 'login', authError = '';
   let privateVisible = false, tab = 'question', modalKind = null, lastFocus = null;
   let quality = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'low' : 'high', gore = true;
   let connection = 'busy', connectionText = token ? '접속 복구 중' : '온라인 대기';
@@ -26,6 +27,8 @@
 
   function sessionGet(key) { try { return sessionStorage.getItem(key) || ''; } catch (_) { return ''; } }
   function sessionSet(key, value) { try { value ? sessionStorage.setItem(key, value) : sessionStorage.removeItem(key); } catch (_) {} }
+  function rememberedName() { try { return localStorage.getItem(NAME_KEY) || ''; } catch (_) { return ''; } }
+  function rememberName(name) { nickname = name; sessionSet(NAME_KEY, name); try { localStorage.setItem(NAME_KEY, name); } catch (_) {} }
   function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
   function icon(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (iconPaths[name] || iconPaths.file) + '</svg>'; }
   function category(id) { return G.CATEGORIES.find(c => c.id === id); }
@@ -47,7 +50,18 @@
   function toast(message) { clearTimeout(toastTimer); $('#toast-host').innerHTML = '<div class="toast">' + esc(message) + '</div>'; toastTimer = setTimeout(() => { $('#toast-host').innerHTML = ''; }, 4500); }
 
   function shell(body) {
-    return '<div class="shell online-shell"><aside class="rail" aria-label="도구"><div class="brand-mark">' + icon('shield') + '</div><div class="rail-line"></div><span class="rail-word">LAST WITNESS / ONLINE</span><div class="rail-bottom"><button class="rail-button" data-action="rules" aria-label="게임 설명">' + icon('file') + '</button><button class="rail-button" data-action="settings" aria-label="효과 설정">' + icon('eye') + '</button></div></aside><header class="app-header"><div class="brand-name">마지막 목격자 <span class="accent">.</span></div><div class="header-meta"><span class="online-badge">ONLINE / 2–6</span>' + (nickname ? '<span class="online-identity">' + esc(nickname) + '</span>' : '') + '<button class="connection" id="connection-status" data-action="refresh" data-state="' + connection + '" title="지금 다시 동기화">' + esc(connectionText) + '</button><button class="text-button" data-action="rules">' + icon('file') + '게임 설명</button>' + (game() && room.status === 'playing' ? '<button class="text-button" data-action="private-toggle">' + icon('lock') + (privateVisible ? '내 정보 가리기' : '내 정보 확인') + '</button>' : '<button class="text-button" data-action="settings">' + icon('eye') + '효과 설정</button>') + (room ? room.status === 'playing' ? '<button class="text-button" data-action="connection-help">접속 안내</button>' : '<button class="text-button" data-action="leave">방 나가기</button>' : '') + '</div></header><main class="main" id="main" tabindex="-1">' + body + '</main><footer class="page-footer"><span>LAST WITNESS · ONLINE</span><span>각자의 비밀 · 함께하는 수사</span></footer></div>';
+    return '<div class="shell online-shell"><aside class="rail" aria-label="도구"><div class="brand-mark">' + icon('shield') + '</div><div class="rail-line"></div><span class="rail-word">LAST WITNESS / ONLINE</span><div class="rail-bottom"><button class="rail-button" data-action="rules" aria-label="게임 설명">' + icon('file') + '</button><button class="rail-button" data-action="settings" aria-label="효과 설정">' + icon('eye') + '</button></div></aside><header class="app-header"><div class="brand-name">마지막 목격자 <span class="accent">.</span></div><div class="header-meta"><span class="online-badge">ONLINE / 2–6</span>' + (token && nickname ? '<span class="online-identity">' + esc(nickname) + '</span>' : '') + '<button class="connection" id="connection-status" data-action="refresh" data-state="' + connection + '" title="지금 다시 동기화">' + esc(connectionText) + '</button><button class="text-button" data-action="rules">' + icon('file') + '게임 설명</button>' + (game() && room.status === 'playing' ? '<button class="text-button" data-action="private-toggle">' + icon('lock') + (privateVisible ? '내 정보 가리기' : '내 정보 확인') + '</button>' : '<button class="text-button" data-action="settings">' + icon('eye') + '효과 설정</button>') + (room ? room.status === 'playing' ? '<button class="text-button" data-action="connection-help">접속 안내</button>' : '<button class="text-button" data-action="leave">방 나가기</button>' : '') + (token && !restoring ? '<button class="text-button" data-action="logout">로그아웃</button>' : '') + '</div></header><main class="main" id="main" tabindex="-1">' + guestSaveBanner() + body + '</main><footer class="page-footer"><span>LAST WITNESS · ONLINE</span><span>각자의 비밀 · 함께하는 수사</span></footer></div>';
+  }
+  function guestSaveBanner() {
+    return token && !account && !restoring ? '<section class="account-save-banner" aria-label="현재 참가자 자리 저장"><div><strong>현재 자리를 저장해 두세요.</strong><p>비밀번호를 등록하면 탭을 닫은 뒤에도 같은 방과 역할로 돌아올 수 있습니다.</p></div><button class="btn compact outline" data-action="upgrade">현재 자리 저장 · 비밀번호 등록</button></section>' : '';
+  }
+  function authFields(mode, upgrade = false) {
+    const registration = mode === 'register', nameKey = upgrade ? 'upgradeName' : 'nickname';
+    return '<div class="auth-fields" id="auth-fields"><label class="field"><span>' + (registration ? '사용할 고유 닉네임' : '닉네임') + '</span><input id="nickname" data-draft="' + nameKey + '" maxlength="20" autocomplete="username" value="' + fieldValue(nameKey, nickname) + '" placeholder="닉네임 1~20자"' + (pending ? ' disabled' : '') + '></label><label class="field"><span>비밀번호' + (registration ? ' · 8~128자' : '') + '</span><input id="password" type="password" minlength="8" maxlength="128" autocomplete="' + (registration ? 'new-password' : 'current-password') + '" placeholder="' + (registration ? '8자 이상으로 정해 주세요' : '등록한 비밀번호') + '"' + (pending ? ' disabled' : '') + '></label>' + (registration ? '<label class="field"><span>비밀번호 확인</span><input id="password-confirm" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="비밀번호를 다시 입력해 주세요"' + (pending ? ' disabled' : '') + '></label>' : '') + '<p class="auth-error" data-auth-error role="alert"' + (!authError ? ' hidden' : '') + '>' + esc(authError) + '</p><button class="btn primary full" data-action="' + (upgrade ? 'upgrade-submit' : registration ? 'register' : 'login') + '" data-mutate' + disabled(false) + '>' + (upgrade ? '비밀번호 등록 · 현재 자리 저장' : registration ? '계정 만들고 시작하기' : '로그인 · 내 사건으로 돌아가기') + ' ' + icon('arrow') + '</button></div>';
+  }
+  function authCard() {
+    const registration = authMode === 'register';
+    return '<section class="online-card login-card account-card" id="online-setup"><div class="eyebrow">' + (registration ? 'CREATE YOUR ACCOUNT' : 'RETURN TO YOUR CASE') + '</div><h2>' + (registration ? '다음에도 이어갈 나의 이름.' : '다시, 나의 사건으로.') + '</h2><p>' + (registration ? '고유한 닉네임과 비밀번호를 정하세요. 탭을 닫아도 같은 계정으로 방과 역할을 이어갑니다.' : '닉네임과 비밀번호로 로그인하면 참여하던 방과 역할이 그대로 돌아옵니다.') + (inviteCode ? '<br><b>' + esc(inviteCode) + '</b> 방으로 초대받았습니다. 기존 사건이 있으면 그 사건으로 먼저 돌아갑니다.' : '') + '</p><div class="auth-tabs" role="tablist" aria-label="계정 접속 방법"><button class="auth-tab ' + (!registration ? 'selected' : '') + '" role="tab" aria-selected="' + !registration + '" aria-controls="auth-fields" data-action="auth-mode" data-mode="login"' + disabled(false) + '>로그인</button><button class="auth-tab ' + (registration ? 'selected' : '') + '" role="tab" aria-selected="' + registration + '" aria-controls="auth-fields" data-action="auth-mode" data-mode="register"' + disabled(false) + '>처음 오셨나요? 계정 만들기</button></div>' + authFields(authMode) + '<p class="online-footer-note">비밀번호는 이 기기에 저장하지 않습니다. 방 기록은 마지막 플레이부터 최대 30일 동안 보관됩니다.</p></section>';
   }
 
   function introArt() {
@@ -56,9 +70,9 @@
   function landing() {
     const hero = '<section class="hero"><div class="hero-copy"><div class="eyebrow">ONLINE ASYMMETRIC MYSTERY</div><h1>마지막<span>목격자</span></h1><div class="hero-line"></div><p class="hero-description">각자의 화면에 숨겨진 진실.<br>다섯 번의 수사, 단 한 번의 고발.<br>친구들과 같은 사건에 접속하세요.</p><div class="hero-actions"><button class="btn primary" data-action="scroll-login">사건에 합류하기 ' + icon('arrow') + '</button><button class="btn outline" data-action="rules">게임 설명</button></div></div>' + introArt() + '</section><div class="intro-strip"><div class="intro-stat"><strong>2~6명</strong><span>각자의 기기로 참여</span></div><div class="intro-stat"><strong>초대 코드</strong><span>친구와 같은 방 접속</span></div><div class="intro-stat"><strong>5라운드</strong><span>공동 수사 매 라운드 1회</span></div><div class="intro-stat"><strong>개인 역할</strong><span>내 정보만 나에게</span></div></div>';
     let setup;
-    if (restoring) setup = '<section class="online-card login-card" id="online-setup"><div class="eyebrow">RECONNECTING</div><h2>참여 중인 사건을 찾고 있습니다.</h2><p>잠시만 기다려 주세요. 같은 탭에서 새로고침하면 기존 참가자로 돌아옵니다.</p></section>';
-    else if (!token) setup = '<section class="online-card login-card" id="online-setup"><div class="eyebrow">ENTER THE CASE</div><h2>어떤 이름으로 부를까요?</h2><p>닉네임을 정하고 친구들의 사건에 참여하세요.' + (inviteCode ? '<br><b>' + esc(inviteCode) + '</b> 방으로 초대받았습니다.' : '') + '</p><label class="field"><span>참가자 닉네임</span><input id="nickname" data-draft="nickname" maxlength="20" autocomplete="nickname" value="' + fieldValue('nickname', nickname) + '" placeholder="닉네임 1~20자"></label><button class="btn primary full" data-action="login" data-mutate' + disabled(false) + '>닉네임으로 시작 ' + icon('arrow') + '</button><p class="online-footer-note">이 탭의 참가자 정보는 최대 24시간 동안 복구할 수 있습니다. 같은 닉네임만 입력해서는 기존 참가자로 돌아갈 수 없습니다.</p></section>';
-    else setup = '<section id="online-setup"><div class="online-section-title"><div><div class="eyebrow">WELCOME, ' + esc(nickname) + '</div><h1>사건을 만들거나 합류하세요.</h1></div><button class="text-button" data-action="change-name">닉네임 변경</button></div><div class="online-setup-grid"><section class="online-card"><div class="eyebrow">CREATE A ROOM</div><h2>새 사건의 방장이 되기</h2><p>최대 인원을 정하고 초대 링크를 공유하세요.<br>두 명 이상 모두 준비하면 시작할 수 있습니다.</p><div class="count-options" aria-label="방 최대 인원">' + [2, 3, 4, 5, 6].map(n => '<button class="count-button ' + (capacity === n ? 'selected' : '') + '" data-action="capacity" data-count="' + n + '" aria-pressed="' + (capacity === n) + '">' + n + '명</button>').join('') + '</div><button class="btn primary full" data-action="create" data-mutate' + disabled(false) + '>최대 ' + capacity + '명 방 만들기 ' + icon('arrow') + '</button></section><section class="online-card"><div class="eyebrow">JOIN AN INVITATION</div><h2>친구의 사건에 합류하기</h2><p>전달받은 여섯 자리 초대 코드를 입력하세요.</p><label class="field"><span>초대 코드</span><input class="join-code" id="join-code" data-draft="joinCode" maxlength="6" autocomplete="off" spellcheck="false" value="' + fieldValue('joinCode', inviteCode) + '" placeholder="ABC234"></label><button class="btn outline full" data-action="join" data-mutate' + disabled(false) + '>초대받은 방 입장</button></section></div></section>';
+    if (restoring) setup = '<section class="online-card login-card" id="online-setup"><div class="eyebrow">RECONNECTING</div><h2>참여 중인 사건을 찾고 있습니다.</h2><p>잠시만 기다려 주세요. 새로고침한 접속을 복구하고 있습니다. 탭을 닫았다면 계정으로 다시 로그인해 돌아올 수 있습니다.</p></section>';
+    else if (!token) setup = authCard();
+    else setup = '<section id="online-setup"><div class="online-section-title"><div><div class="eyebrow">WELCOME, ' + esc(nickname) + '</div><h1>사건을 만들거나 합류하세요.</h1></div><span class="tag">' + (account ? '계정으로 접속 중' : '이전 참가자 접속') + '</span></div><div class="online-setup-grid"><section class="online-card"><div class="eyebrow">CREATE A ROOM</div><h2>새 사건의 방장이 되기</h2><p>최대 인원을 정하고 초대 링크를 공유하세요.<br>두 명 이상 모두 준비하면 시작할 수 있습니다.</p><div class="count-options" aria-label="방 최대 인원">' + [2, 3, 4, 5, 6].map(n => '<button class="count-button ' + (capacity === n ? 'selected' : '') + '" data-action="capacity" data-count="' + n + '" aria-pressed="' + (capacity === n) + '">' + n + '명</button>').join('') + '</div><button class="btn primary full" data-action="create" data-mutate' + disabled(false) + '>최대 ' + capacity + '명 방 만들기 ' + icon('arrow') + '</button></section><section class="online-card"><div class="eyebrow">JOIN AN INVITATION</div><h2>친구의 사건에 합류하기</h2><p>전달받은 여섯 자리 초대 코드를 입력하세요.</p><label class="field"><span>초대 코드</span><input class="join-code" id="join-code" data-draft="joinCode" maxlength="6" autocomplete="off" spellcheck="false" value="' + fieldValue('joinCode', inviteCode) + '" placeholder="ABC234"></label><button class="btn outline full" data-action="join" data-mutate' + disabled(false) + '>초대받은 방 입장</button></section></div></section>';
     return shell('<div class="online-landing party-intro">' + hero + setup + '<section class="online-how"><ol><li><strong>각자의 화면으로 접속</strong>방장이 초대 링크나 코드를 공유하면 모두 같은 방에 입장합니다.</li><li><strong>혼자 역할을 확인</strong>내 정보는 기본으로 가려집니다. 다른 참가자의 비밀 카드는 내 화면에 오지 않습니다.</li><li><strong>함께 추리하고 이야기</strong>순서대로 개인 행동을 마치고, 탐정의 수사와 자유 토론으로 진실을 좁힙니다.</li></ol></section></div>');
   }
 
@@ -134,7 +148,7 @@
     return shell('<div class="result party-result online-result"><header class="result-header"><span class="result-seal">' + (win ? 'CASE CLOSED' : 'CASE UNSOLVED') + '</span><h1>' + (win ? '수사 진영의 승리' : '범인 진영의 승리') + '</h1><p>' + (win ? '사건 인물과 장소를 모두 맞혔습니다. 탐정·목격자·용의자가 함께 승리합니다.' : '최종 고발이 빗나갔습니다. 범인과 공범이 함께 승리합니다.') + '</p></header><div class="case-solution"><article class="solution-card"><span class="eyebrow">실제 사건 인물</span><div class="solution-portrait"><div class="portrait">' + portrait(G.SUSPECTS.findIndex(p => p.id === secret.suspectId)) + '</div></div><h2>' + npc(secret.suspectId).name + '</h2><p>' + npc(secret.suspectId).bits.map((b, i) => G.CATEGORIES[i].values[b]).join(' · ') + '</p></article><article class="solution-card"><span class="eyebrow">실제 범행 장소</span><div class="result-location place" data-place="' + secret.placeId + '" style="height:160px;margin-top:16px"></div><h2>' + place(secret.placeId).name + '</h2><p>' + place(secret.placeId).bits.map((b, i) => G.CATEGORIES[i + 3].values[b]).join(' · ') + '</p></article></div><div class="banner ' + (win ? 'success' : 'error') + '"><p>탐정의 고발: <b>' + npc(g.accusation.suspectId).name + ' / ' + place(g.accusation.placeId).name + '</b><br>' + g.round + '라운드에서 사건 종료</p></div><div class="divider-title"><h2>모든 역할과 진영 공개</h2></div><div class="result-roles">' + r.players.map(p => '<article class="result-role ' + (G.ROLES[p.role].team === g.winner ? 'winner' : '') + '"><div class="role-art" data-role="' + p.role + '" aria-hidden="true"></div><h3>' + esc(p.name) + ' · ' + roleLabel(p.role) + '</h3><p>' + (G.ROLES[p.role].team === 'criminals' ? '범인 진영' : '수사 진영') + '</p>' + (G.ROLES[p.role].team === g.winner ? '<b>공동 승리</b>' : '') + '</article>').join('') + '</div><div class="divider-title"><h2>공식 진술의 진상</h2></div>' + (g.statements.length ? g.statements.map(s => '<div class="record-card claim"><span class="record-label">R' + s.round + ' · ' + esc(playerName(s.speakerId, g)) + '</span><p>' + factText(s.category, s.value) + '</p><small>' + (s.value === truth(secret, s.category) ? '진실' : '거짓 · 실제 ' + category(s.category).values[truth(secret, s.category)]) + '</small></div>').join('') : '<p class="empty">공식 진술 없이 사건이 끝났습니다.</p>') + '<div class="result-actions">' + (isHost() ? '<button class="btn primary" data-action="restart" data-mutate' + disabled(false) + '>같은 참가자로 새 사건 준비</button>' : '<p class="public-warning">방장이 새 사건 준비를 누르면 함께 대기실로 돌아갑니다.</p>') + '<button class="btn outline" data-action="leave">방 나가기</button></div></div>');
   }
 
-  function captureDrafts() { app.querySelectorAll('[data-draft]').forEach(e => { drafts[e.dataset.draft] = e.value; }); }
+  function captureDrafts() { app.querySelectorAll('[data-draft]').forEach(e => { if (e.type !== 'password' && !/password/i.test(e.dataset.draft)) drafts[e.dataset.draft] = e.value; }); }
   function render(skipCapture = false) {
     if (!skipCapture) captureDrafts();
     const active = document.activeElement, focusId = active && app.contains(active) ? active.id : null;
@@ -147,11 +161,11 @@
     if (focusId) { const next = document.getElementById(focusId); if (next && !next.disabled) { next.focus({ preventScroll: true }); if (selection && typeof next.setSelectionRange === 'function' && next.type !== 'number') { try { next.setSelectionRange(...selection); } catch (_) {} } } }
     const nextChat = $('#chat-history'); if (nextChat) nextChat.scrollTop = !chatScroll || chatScroll.atBottom ? nextChat.scrollHeight : chatScroll.top;
     app.querySelectorAll('.record-scroll').forEach((el, i) => { el.scrollTop = recordScroll[i] || 0; });
-    window.scrollTo(...scroll); updateConnection();
+    window.scrollTo(...scroll); updateConnection(); updateAuthError();
   }
   function updateConnection() { const el = $('#connection-status'); if (el) { el.textContent = connectionText; el.dataset.state = connection; } }
   function updatePresence() { if (!room) return; room.members.forEach(m => document.querySelectorAll('[data-member-online="' + m.id + '"]').forEach(el => { const chip = el.closest('.online-seat'); el.textContent = chip ? (m.online ? '●' : '○') : (m.online ? '접속 중' : '잠시 연결 끊김'); el.classList.toggle('offline', !m.online); })); }
-  function acceptRoom(nextRoom) {
+  function acceptRoom(nextRoom, force = false) {
     if (room && nextRoom && room.code === nextRoom.code && nextRoom.revision < room.revision) return;
     const old = room, changedRoom = (old?.code || null) !== (nextRoom?.code || null);
     const phaseChanged = old?.game?.phase !== nextRoom?.game?.phase || old?.game?.turnOwnerId !== nextRoom?.game?.turnOwnerId || old?.game?.round !== nextRoom?.game?.round;
@@ -159,9 +173,15 @@
     room = nextRoom;
     const resetDrafts = changedRoom || old?.status === 'finished' && nextRoom?.status === 'lobby';
     if (resetDrafts) { privateVisible = false; marksS.clear(); marksP.clear(); Object.keys(drafts).forEach(k => { if (!['nickname', 'joinCode'].includes(k)) delete drafts[k]; }); closeModal(); }
-    if (phaseChanged) { privateVisible = false; if (modalKind && !['rules', 'settings'].includes(modalKind)) closeModal(); }
+    if (phaseChanged) { privateVisible = false; if (modalKind && !['rules', 'settings', 'register', 'logout', 'connection'].includes(modalKind)) closeModal(); }
     if (room?.status === 'finished') privateVisible = false;
-    if (changed) render(resetDrafts); else { updatePresence(); updateConnection(); }
+    if (changed || force) render(resetDrafts); else { updatePresence(); updateConnection(); }
+  }
+  function acceptAccount(nextAccount) {
+    const changed = account?.id !== nextAccount?.id || account?.name !== nextAccount?.name;
+    account = nextAccount || null;
+    if (account?.name) rememberName(account.name);
+    return changed;
   }
 
   async function request(body) {
@@ -173,7 +193,11 @@
     if (!response.ok || data.error) { const message = typeof data.error === 'string' ? data.error : data.error?.message || data.message || '요청을 처리하지 못했습니다.'; const error = new Error(message); error.status = response.status; error.code = data.code; throw error; }
     return data;
   }
-  function expireSession() { token = ''; room = null; privateVisible = false; restoring = false; sessionSet(TOKEN_KEY, ''); closeModal(); render(); }
+  function expireSession(message = '접속 시간이 만료되었습니다. 닉네임과 비밀번호로 다시 로그인하면 방과 역할을 이어갑니다.') {
+    token = ''; room = null; account = null; privateVisible = false; restoring = false; generation += 1;
+    authMode = 'login'; authError = message; sessionSet(TOKEN_KEY, ''); clearPasswordFields(); closeModal(); marksS.clear(); marksP.clear();
+    Object.keys(drafts).forEach(key => { if (key !== 'nickname') delete drafts[key]; }); render(true);
+  }
   async function mutate(op, extra = {}) {
     if (pending) return null;
     captureDrafts(); pending = true; generation += 1;
@@ -182,11 +206,16 @@
     try {
       const data = await request({ op, ...(token ? { token } : {}), revision: room?.revision ?? null, requestId: requestId(), ...extra });
       if (data.token) { token = data.token; sessionSet(TOKEN_KEY, token); }
-      connection = 'online'; connectionText = '실시간 동기화'; restoring = false;
-      if (Object.prototype.hasOwnProperty.call(data, 'room')) acceptRoom(data.room);
+      if (op === 'logout') { token = ''; sessionSet(TOKEN_KEY, ''); privateVisible = false; authMode = 'login'; authError = account ? '로그아웃했습니다. 다시 로그인하면 같은 방과 역할로 돌아옵니다.' : '로그아웃했습니다. 비밀번호를 등록하지 않은 이전 자리는 복구할 수 없습니다.'; }
+      const accountChanged = Object.prototype.hasOwnProperty.call(data, 'account') ? acceptAccount(data.account) : false;
+      connection = 'online'; connectionText = token ? '실시간 동기화' : '로그인 대기'; restoring = false;
+      if (Object.prototype.hasOwnProperty.call(data, 'room')) acceptRoom(data.room, accountChanged);
       return data;
     } catch (error) {
-      if (error.status === 401) { expireSession(); toast('참가자 접속이 만료되었습니다. 닉네임으로 다시 시작해 주세요.'); }
+      if (op === 'login' && error.status === 401) { authError = '닉네임 또는 비밀번호가 일치하지 않습니다. 입력 내용을 확인해 주세요.'; }
+      else if (op === 'register' && error.code === 'NAME_TAKEN') { authError = '이미 사용 중인 닉네임입니다. 다른 닉네임을 정하거나 기존 계정으로 로그인해 주세요.'; }
+      else if (['login', 'register'].includes(op) && error.status !== 401) { authError = error.message || '계정 접속을 완료하지 못했습니다. 잠시 뒤 다시 시도해 주세요.'; }
+      else if (error.status === 401) { expireSession(); toast('다시 로그인해 내 사건으로 돌아와 주세요.'); }
       else if (error.status === 409 && ['REVISION_CONFLICT', 'BUSY'].includes(error.code)) { toast('방의 상태가 달라졌습니다. 최신 상태를 확인한 뒤 다시 선택해 주세요. 행동은 자동으로 반복하지 않습니다.'); }
       else toast(error.message || '연결을 확인한 뒤 다시 시도해 주세요.');
       connection = error.status ? 'online' : 'offline'; connectionText = error.status ? '최신 상태 확인 중' : '연결 끊김 · 다시 시도';
@@ -205,11 +234,12 @@
       const data = await request({ op: 'poll', token, revision: room?.revision ?? null });
       if (atGeneration !== generation) return;
       connection = 'online'; connectionText = '실시간 동기화'; const wasRestoring = restoring; restoring = false;
-      if (Object.prototype.hasOwnProperty.call(data, 'room')) acceptRoom(data.room);
+      const accountChanged = Object.prototype.hasOwnProperty.call(data, 'account') ? acceptAccount(data.account) : false;
+      if (Object.prototype.hasOwnProperty.call(data, 'room')) acceptRoom(data.room, accountChanged);
       if (wasRestoring && !room) render(); updateConnection();
     } catch (error) {
       if (atGeneration !== generation) return;
-      if (error.status === 401) { expireSession(); toast('참가자 접속이 만료되었습니다. 다시 시작해 주세요.'); }
+      if (error.status === 401) { expireSession(); toast('다시 로그인해 내 사건으로 돌아와 주세요.'); }
       else { connection = 'offline'; connectionText = '연결 끊김 · 자동 재접속 중'; updateConnection(); if (restoring) { restoring = false; render(); } }
     } finally { pollBusy = false; schedulePoll(); }
   }
@@ -219,9 +249,39 @@
     modalHost.innerHTML = '<div class="modal-root"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><header class="modal-head"><div><div class="eyebrow">LAST WITNESS / ONLINE</div><h2 id="modal-title">' + title + '</h2></div><button class="close-btn" data-action="close-modal" aria-label="닫기">×</button></header>' + body + '</section></div>';
     document.body.style.overflow = 'hidden'; modalHost.querySelector('button,select,input,textarea')?.focus();
   }
-  function closeModal() { modalHost.innerHTML = ''; modalKind = null; document.body.style.overflow = ''; if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true }); }
+  function clearPasswordFields() { ['password', 'password-confirm'].forEach(id => { const input = document.getElementById(id); if (input) input.value = ''; }); }
+  function updateAuthError() { document.querySelectorAll('[data-auth-error]').forEach(el => { el.textContent = authError; el.hidden = !authError; }); }
+  function closeModal() { clearPasswordFields(); modalHost.innerHTML = ''; modalKind = null; document.body.style.overflow = ''; if (lastFocus?.isConnected) lastFocus.focus({ preventScroll: true }); }
+  function upgradeModal() {
+    if (!token || account) return;
+    privateVisible = false; authError = ''; render();
+    openModal('register', '지금의 방과 역할을 저장하세요', '<p class="small subtle">현재 참가자 자리에 비밀번호를 등록합니다. 진행 중인 방, 역할, 단서, 차례가 그대로 유지됩니다. 등록한 닉네임과 비밀번호로 새 탭에서도 돌아올 수 있습니다.</p>' + authFields('register', true) + '<p class="online-footer-note">닉네임이 이미 사용 중이라면 다른 이름으로 정할 수 있습니다. 사건 속 역할과 단서는 바뀌지 않습니다.</p>');
+  }
+  function logoutModal() {
+    if (!token) return;
+    privateVisible = false; render();
+    openModal('logout', '로그아웃할까요?', account ? '<p class="small subtle">방과 역할은 그대로 유지됩니다. 탭을 닫아도 같은 닉네임과 비밀번호로 다시 로그인하면 현재 자리로 돌아옵니다.</p><div class="modal-actions"><button class="btn outline" data-action="close-modal">계속 플레이</button><button class="btn danger" data-action="logout-confirm" data-mutate>로그아웃</button></div>' : '<p class="small subtle">아직 비밀번호를 등록하지 않았습니다. 이대로 로그아웃하면 현재 자리를 다시 찾을 수 없습니다. 먼저 현재 자리를 저장해 주세요.</p><div class="modal-actions"><button class="btn primary" data-action="upgrade">비밀번호 등록 · 자리 저장</button><button class="btn danger" data-action="logout-confirm" data-mutate>저장하지 않고 로그아웃</button></div>');
+  }
+  async function submitAuth(mode, upgrade = false) {
+    if (pending) return;
+    const name = ($('#nickname')?.value || '').trim();
+    const password = $('#password')?.value || '', confirmation = $('#password-confirm')?.value || '';
+    clearPasswordFields(); authError = '';
+    if (!name || name.length > 20) authError = '닉네임을 1~20자로 입력해 주세요.';
+    else if (password.length < 8 || password.length > 128) authError = '비밀번호를 8~128자로 입력해 주세요.';
+    else if (mode === 'register' && password !== confirmation) authError = '비밀번호 확인이 일치하지 않습니다. 두 칸을 다시 입력해 주세요.';
+    if (authError) { render(); updateAuthError(); return; }
+    if (!upgrade) { rememberName(name); drafts.nickname = name; }
+    const data = await mutate(mode, { name, password });
+    if (!data) { updateAuthError(); return; }
+    authError = ''; privateVisible = false;
+    if (upgrade) { closeModal(); toast('현재 방과 역할을 계정에 저장했습니다. 다음에도 로그인해 이어갈 수 있습니다.'); }
+    if (data.room) inviteCode = '';
+    else if (inviteCode && !upgrade) { const code = inviteCode; inviteCode = ''; await mutate('join', { code }); }
+    render();
+  }
   async function showRules() {
-    const online = '<section class="online-rule-intro"><h3>온라인으로 함께하는 방법</h3><p>각자의 기기로 접속해 닉네임을 정합니다. 방장이 초대 링크나 여섯 자리 코드를 공유하면 같은 방에 입장하세요. 두 명 이상 현재 참가자 모두 준비한 뒤 방장이 시작합니다.</p><p>순서가 된 사람의 화면에만 행동 버튼이 열립니다. 내 정보 확인을 누르면 내 역할·단서를 보고, 화면을 벗어나면 다시 가려집니다. 다른 참가자의 역할 카드는 내 화면에 제공되지 않습니다.</p><p>공식 기록과 차례는 자동으로 동기화됩니다. 토론 화면에서는 본인 닉네임으로 자유 발언을 보낼 수 있습니다. 연결이 잠시 끊기면 같은 탭에서 돌아오세요. 새 탭은 별도 참가자이므로 기존 참가자로 복구되지 않습니다.</p></section>';
+    const online = '<section class="online-rule-intro"><h3>온라인으로 함께하는 방법</h3><p>각자의 기기로 닉네임과 비밀번호를 등록하고 로그인합니다. 방장이 초대 링크나 여섯 자리 코드를 공유하면 같은 방에 입장하세요. 두 명 이상 현재 참가자 모두 준비한 뒤 방장이 시작합니다.</p><p>순서가 된 사람의 화면에만 행동 버튼이 열립니다. 내 정보 확인을 누르면 내 역할·단서를 보고, 화면을 벗어나면 다시 가려집니다. 다른 참가자의 역할 카드는 내 화면에 제공되지 않습니다.</p><p>공식 기록과 차례는 자동으로 동기화됩니다. 탭을 닫거나 로그아웃해도 같은 계정으로 다시 로그인하면 방과 역할이 그대로 돌아옵니다. 로그인 접속은 24시간 유효하며 다시 로그인해 이어갈 수 있습니다. 방 기록은 마지막 플레이부터 최대 30일 동안 보관합니다. 이전 비밀번호 없는 참가자는 현재 자리 저장을 먼저 완료해 주세요.</p></section>';
     openModal('rules', '게임 설명 · 온라인 방법', '<div class="rules-content party-rules">' + online + '<div id="rules-body" class="online-rules-loading">규칙을 불러오고 있습니다.</div></div>');
     try { if (!rulesCache) { const response = await fetch('/party-rules.html', { cache: 'force-cache' }); if (!response.ok) throw new Error(); rulesCache = await response.text(); } if (modalKind === 'rules') { const host = $('#rules-body'); if (host) { host.className = ''; host.innerHTML = rulesCache; } } }
     catch (_) { if (modalKind === 'rules') $('#rules-body').innerHTML = '<p>규칙을 불러오지 못했습니다. <a href="/party-rules.html" target="_blank" rel="noopener">전체 규칙 열기</a></p>'; }
@@ -237,15 +297,20 @@
   async function act(action, button) {
     const d = button?.dataset || {};
     if (action === 'scroll-login') { $('#online-setup')?.scrollIntoView({ behavior: quality === 'off' ? 'auto' : 'smooth', block: 'center' }); $('#nickname')?.focus({ preventScroll: true }); }
-    else if (action === 'login') { const name = ($('#nickname')?.value || '').trim(); if (!name || name.length > 20) { toast('닉네임을 1~20자로 입력해 주세요.'); return; } nickname = name; sessionSet(NAME_KEY, nickname); const data = await mutate('login', { name }); if (data && inviteCode) { const code = inviteCode; inviteCode = ''; await mutate('join', { code }); } }
-    else if (action === 'change-name') { token = ''; sessionSet(TOKEN_KEY, ''); generation++; clearTimeout(pollTimer); render(); }
+    else if (action === 'auth-mode') { if (!pending) { clearPasswordFields(); authMode = d.mode === 'register' ? 'register' : 'login'; authError = ''; render(); } }
+    else if (action === 'login') await submitAuth('login');
+    else if (action === 'register') await submitAuth('register');
+    else if (action === 'upgrade') upgradeModal();
+    else if (action === 'upgrade-submit') await submitAuth('register', true);
+    else if (action === 'logout' || action === 'change-name') logoutModal();
+    else if (action === 'logout-confirm') { const data = await mutate('logout'); if (data) { closeModal(); render(); } }
     else if (action === 'capacity') { capacity = Number(d.count); render(); }
     else if (action === 'create') await mutate('create', { capacity });
     else if (action === 'join') { const code = ($('#join-code')?.value || inviteCode || '').trim().toUpperCase(); if (!/^[A-Z2-9]{6}$/.test(code)) { toast('초대 코드 여섯 자리를 확인해 주세요.'); return; } await mutate('join', { code }); }
     else if (action === 'ready') await mutate('ready', { ready: !ready });
     else if (action === 'start') await mutate('start');
     else if (action === 'copy-invite') await copyInvite();
-    else if (action === 'connection-help') openModal('connection', '접속을 잠시 벗어날 때', '<p class="small subtle">게임이 진행 중일 때는 참가자를 바꾸거나 방에서 나갈 수 없습니다. 연결이 끊겼다면 같은 탭에서 새로고침해 돌아오세요. 참가자 접속 정보는 최대 24시간 유효합니다.</p><p class="online-footer-note">내 비밀 정보는 창을 벗어날 때 가려집니다. 다른 참가자는 현재 차례를 기다리게 되므로 잠시 자리를 비우면 함께하는 사람에게 알려 주세요.</p>');
+    else if (action === 'connection-help') openModal('connection', '접속을 잠시 벗어날 때', '<p class="small subtle">게임이 진행 중일 때 방과 역할은 유지됩니다. 탭을 닫거나 로그아웃했더라도 같은 계정으로 로그인하면 현재 자리로 돌아옵니다. 로그인 접속은 24시간 유효하며, 만료되면 다시 로그인하면 됩니다. 방 기록은 마지막 플레이부터 최대 30일 보관됩니다.</p><p class="online-footer-note">내 비밀 정보는 창을 벗어날 때 가려집니다. 다른 참가자는 현재 차례를 기다리게 되므로 잠시 자리를 비우면 함께하는 사람에게 알려 주세요.</p>');
     else if (action === 'refresh') await poll();
     else if (action === 'rules') await showRules();
     else if (action === 'rule-jump') { if (['goal', 'components', 'setup', 'play', 'round-end', 'win'].includes(d.id)) modalHost.querySelector('#party-rule-' + d.id)?.scrollIntoView({ block: 'start' }); }
@@ -280,12 +345,12 @@
   }
 
   document.addEventListener('click', event => { const button = event.target.closest('[data-action]'); if (!button || button.disabled) return; const action = button.dataset.action; Promise.resolve(act(action, button)).catch(() => toast('요청을 완료하지 못했습니다. 최신 상태를 확인해 주세요.')); if (gore && quality !== 'off' && !['private-toggle', 'close-modal'].includes(action)) FX?.burst?.(event.clientX, event.clientY, 'blood'); });
-  document.addEventListener('input', event => { if (event.target.dataset.draft) drafts[event.target.dataset.draft] = event.target.value; });
-  document.addEventListener('change', event => { const el = event.target; if (el.dataset.draft) drafts[el.dataset.draft] = el.value; if (el.dataset.change === 'quality') { quality = el.value; applyFX(); } else if (el.dataset.change === 'gore') { gore = el.checked; applyFX(); } else if (el.dataset.change === 'accuse') { const button = $('#confirm-accuse'); if (button) button.disabled = pending || !$('#accuse-person').value || !$('#accuse-place').value; } });
+  document.addEventListener('input', event => { if (event.target.dataset.draft && event.target.type !== 'password' && !/password/i.test(event.target.dataset.draft)) drafts[event.target.dataset.draft] = event.target.value; });
+  document.addEventListener('change', event => { const el = event.target; if (el.dataset.draft && el.type !== 'password' && !/password/i.test(el.dataset.draft)) drafts[el.dataset.draft] = el.value; if (el.dataset.change === 'quality') { quality = el.value; applyFX(); } else if (el.dataset.change === 'gore') { gore = el.checked; applyFX(); } else if (el.dataset.change === 'accuse') { const button = $('#confirm-accuse'); if (button) button.disabled = pending || !$('#accuse-person').value || !$('#accuse-place').value; } });
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') { if (modalKind) closeModal(); privacy(); }
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && event.target.id === 'chat-text') { event.preventDefault(); act('send-note'); }
-    else if (event.key === 'Enter' && event.target.id === 'nickname') { event.preventDefault(); act('login'); }
+    else if (event.key === 'Enter' && ['nickname', 'password', 'password-confirm'].includes(event.target.id)) { event.preventDefault(); act(modalKind === 'register' ? 'upgrade-submit' : authMode === 'register' ? 'register' : 'login'); }
     else if (event.key === 'Enter' && event.target.id === 'join-code') { event.preventDefault(); act('join'); }
     if (event.key === 'Tab' && modalKind) { const list = [...modalHost.querySelectorAll('button:not(:disabled),select,input,textarea,a[href]')], first = list[0], last = list.at(-1); if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); } }
   });

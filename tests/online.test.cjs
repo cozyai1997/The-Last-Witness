@@ -7,7 +7,8 @@ function modules(){for(const f of ['../lib/store.cjs','../lib/game-service.cjs',
 let seq=0;
 function rid(){return 'request-'+(++seq);}
 function fixture(options={}){const {store,service}=modules();let clock=1700000000000;const backend=new store.MemoryStore();const svc=service.createService({store:backend,now:()=>clock,sessionSecret:'test-session-secret',gameOptions:{seed:17,secret:{suspectId:'s0',placeId:'p0'}},...options});return {backend,svc,advance(ms){clock+=ms;},async call(body,ip='127.0.0.1'){return svc.handle(body,{ip});}};}
-async function login(f,name){return (await f.call({op:'login',name,requestId:rid()})).token;}
+const TEST_PASSWORD='Strong test password 42!';
+async function login(f,name){return (await f.call({op:'register',name,password:TEST_PASSWORD,requestId:rid()})).token;}
 async function create(f,token,capacity=6){return (await f.call({op:'create',token,capacity,requestId:rid()})).room;}
 async function poll(f,token){return (await f.call({op:'poll',token})).room;}
 async function mutate(f,token,op,extra={}){const room=await poll(f,token);return f.call({op,token,revision:room?.revision,requestId:rid(),...extra});}
@@ -25,10 +26,10 @@ test('login tokens are private and refresh reconnects the same member without im
  const serialized=JSON.stringify(room);assert.ok(!serialized.includes(token));for(const m of room.members){assert.equal(m.tokenHash,undefined);assert.equal(m.role,undefined);}
  const documents=JSON.stringify(await f.backend.get('witness:world'));assert.ok(!documents.includes(token));await assert.rejects(()=>f.call({op:'poll',token:'invalid-token'}),e=>e.status===401);
 });
-test('public nickname and login request ID can never recover another guest bearer token',async()=>{
- const f=fixture(),body={op:'login',name:'Public nickname',requestId:'known-public-id'};
+test('public nickname and request ID cannot recover a password-protected account',async()=>{
+ const f=fixture(),body={op:'register',name:'Public nickname',password:TEST_PASSWORD,requestId:'known-public-id'};
  const original=await f.call(body,'192.0.2.1');const room=await create(f,original.token,2);
- const repeated=await f.call(body,'192.0.2.2');assert.notEqual(repeated.token,original.token);assert.equal(repeated.room,null);
+ await assert.rejects(()=>f.call({op:'login',name:body.name,requestId:body.requestId},'192.0.2.2'),e=>e.status===401);
  assert.equal((await poll(f,original.token)).meId,room.meId);
 });
 test('room creation, readiness and host start enforce lobby authority without needing a full room',async()=>{
@@ -96,9 +97,10 @@ test('a full six-player game completes five rounds, safely reveals results, and 
  room=(await engineAction(f,tokens,{type:'ACCUSE',suspectId:'s0',placeId:'p0'})).room;assert.equal(room.status,'finished');assert.equal(room.game.winner,'investigators');assert.deepEqual(room.game.reveal.secret,{suspectId:'s0',placeId:'p0'});
  await assert.rejects(()=>mutate(f,tokens[1],'restart'),e=>e.status===403);room=(await mutate(f,tokens[0],'restart')).room;assert.equal(room.status,'lobby');assert.equal(room.game,null);assert.ok(room.members.every(m=>!m.ready));
 });
-test('session and room TTLs are absolute and expired sessions cannot reconnect',async()=>{
+test('sessions expire after 24 hours while account rooms retain thirty days of inactivity',async()=>{
  const f=fixture(),token=await login(f,'A');await create(f,token,2);f.advance(23*3600000);assert.ok(await poll(f,token));f.advance(3600001);await assert.rejects(()=>poll(f,token),e=>e.status===401);
- const fresh=await login(f,'B');assert.equal(await poll(f,fresh),null);const doc=await f.backend.get('witness:world');assert.equal(Object.keys(doc.value.rooms).length,0);
+ const fresh=await login(f,'B');assert.equal(await poll(f,fresh),null);let doc=await f.backend.get('witness:world');assert.equal(Object.keys(doc.value.rooms).length,1);
+ const recovered=await f.call({op:'login',name:'A',password:TEST_PASSWORD});assert.ok(recovered.room);f.advance(30*24*3600000);await f.call({op:'login',name:'A',password:TEST_PASSWORD});doc=await f.backend.get('witness:world');assert.equal(Object.keys(doc.value.rooms).length,0);
 });
 test('rate limits persist across service instances and never store raw IP addresses',async()=>{
  const f=fixture({rateLimit:3}),token=await login(f,'A');await poll(f,token);await poll(f,token);await assert.rejects(()=>poll(f,token),e=>e.status===429);
@@ -112,7 +114,7 @@ test('Supabase RPC store sends the guarded contract and never silently falls bac
 function response(){return {statusCode:200,headers:{},setHeader(k,v){this.headers[k.toLowerCase()]=v;},status(n){this.statusCode=n;return this;},json(body){this.body=body;return this;},end(text){this.body=JSON.parse(text);}};}
 test('API enforces POST, JSON body limit, same-origin and no-cache, without leaking storage errors',async()=>{
  const {handler}=modules(),f=fixture(),h=handler.createHandler(f.svc,{production:false});
- const call=async(req)=>{const res=response();await h({headers:{host:'localhost:3000','content-type':'application/json',origin:'http://localhost:3000'},socket:{remoteAddress:'test-ip'},body:{op:'login',name:'A',requestId:rid()},method:'POST',...req},res);return res;};
+ const call=async(req)=>{const res=response();await h({headers:{host:'localhost:3000','content-type':'application/json',origin:'http://localhost:3000'},socket:{remoteAddress:'test-ip'},body:{op:'register',name:'A',password:TEST_PASSWORD,requestId:rid()},method:'POST',...req},res);return res;};
  assert.equal((await call({method:'GET'})).statusCode,405);assert.equal((await call({headers:{host:'localhost:3000','content-type':'application/json',origin:'https://evil.example'}})).statusCode,403);assert.equal((await call({body:'x'.repeat(16385)})).statusCode,413);
  const success=await call({});assert.equal(success.statusCode,200);assert.match(success.headers['cache-control'],/no-store/);assert.ok(success.body.token);
  const broken=handler.createHandler({handle:async()=>{throw new Error('secret raw database password');}},{production:false}),res=response();await broken({method:'POST',headers:{host:'localhost','content-type':'application/json'},body:{op:'poll'},socket:{remoteAddress:'x'}},res);assert.equal(res.statusCode,503);assert.ok(!JSON.stringify(res.body).includes('database password'));
@@ -121,7 +123,7 @@ test('real HTTP requests receive JSON validation and body-limit responses withou
  const http=require('node:http'),{handler}=modules(),f=fixture(),server=http.createServer(handler.createHandler(f.svc,{production:false}));
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+server.address().port;
  try{
-  const valid=await fetch(origin+'/api/room',{method:'POST',headers:{'Content-Type':'application/json',Origin:origin},body:JSON.stringify({op:'login',name:'HTTP guest'})});assert.equal(valid.status,200);assert.ok((await valid.json()).token);
+  const valid=await fetch(origin+'/api/room',{method:'POST',headers:{'Content-Type':'application/json',Origin:origin},body:JSON.stringify({op:'register',name:'HTTP guest',password:TEST_PASSWORD})});assert.equal(valid.status,200);assert.ok((await valid.json()).token);
   const invalid=await fetch(origin+'/api/room',{method:'POST',headers:{'Content-Type':'application/json',Origin:origin},body:'{broken'});assert.equal(invalid.status,400);assert.equal((await invalid.json()).code,'INVALID_JSON');
   const large=await fetch(origin+'/api/room',{method:'POST',headers:{'Content-Type':'application/json',Origin:origin},body:JSON.stringify({text:'x'.repeat(20000)})});assert.equal(large.status,413);assert.ok((await large.json()).error);
  }finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}

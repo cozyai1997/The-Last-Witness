@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-10-17T06:27:59.831Z",
+  "generatedAt": "2026-10-17T06:54:53.108Z",
   "status": "PASS",
   "scope": "Independent in-process service review with fresh MemoryStore fixtures; no live credentials, HTTP deployment, SQL execution or browser automation",
   "checks": [
     {
       "id": "S01",
-      "name": "Predictable login ID cannot recover another guest",
+      "name": "Public nickname and request ID cannot recover a seat without the password",
       "result": "PASS"
     },
     {
@@ -94,20 +94,25 @@
       "result": "PASS"
     },
     {
+      "id": "A01",
+      "name": "Six account re-logins rotate tokens and preserve all case state and private roles",
+      "result": "PASS"
+    },
+    {
       "id": "S09",
       "name": "Polling just before absolute TTL does not extend session",
       "result": "PASS",
       "clock": "Injected clock, not a real 24-hour wait"
     }
   ],
-  "checksPassed": 19,
+  "checksPassed": 20,
   "phaseSnapshotSetsChecked": 18,
   "projectionsPerSnapshot": 6,
   "resolvedFinding": {
     "severity": "P1",
     "issue": "Predictable public nickname + login requestId previously recovered the same guest bearer token",
     "before": "Reproduced from another fixture IP: same bearer, existing room, same member",
-    "after": "Fresh independent token and no inherited room; regression passes"
+    "after": "Public login fields and wrong password cannot retrieve any existing account or seat; authenticated password recovery keeps the rightful seat"
   },
   "outsideThisHarness": [
     "Production Supabase RPC access controls (separately checked by deployment owner)",

@@ -1,13 +1,16 @@
 {
   "name": "the-last-witness",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "private": true,
   "description": "마지막 목격자 — 2~6인 온라인 비대칭 추리 게임",
   "scripts": {
     "build": "node scripts/build.cjs",
     "start": "node scripts/dev.cjs",
     "test": "node --test tests/*.test.cjs",
-    "test:security": "node tests/security-review.cjs"
+    "test:security": "node tests/security-review.cjs",
+    "test:auth-review": "node tests/auth-review.cjs"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  }
 }

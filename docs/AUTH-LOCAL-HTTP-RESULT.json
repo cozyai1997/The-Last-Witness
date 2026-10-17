@@ -1,0 +1,19 @@
+{
+  "base": "http://127.0.0.1:4174",
+  "passed": true,
+  "sessions": 7,
+  "simultaneousPlayers": 6,
+  "rounds": 5,
+  "serverRequests": 308,
+  "maxRequestMs": 2715,
+  "averageRequestMs": 518,
+  "privacy": true,
+  "capacityRace": true,
+  "protectedEvidence": true,
+  "sharedLieBudget": true,
+  "guardAndSeal": true,
+  "reconnect": true,
+  "passwordReLogin": true,
+  "logoutPreservesSeat": true,
+  "restart": true
+}

@@ -1,0 +1,75 @@
+{
+  "title": "Quiet Evidence / 고요한 증거",
+  "originalComposition": true,
+  "provenance": "Composed and synthesized from equations and deterministic noise; no external music, recordings, voices or instrument samples.",
+  "seed": 4172026,
+  "tempoBpm": 60,
+  "bars": 16,
+  "key": "D minor",
+  "loopSeconds": 64.0,
+  "structure": "Dm(add9), Bbmaj7, Gm9, A7sus4, Dm(add9)/F, Bbmaj7, Em7b5, A7(b9); two bars each",
+  "loopMethod": "Circular placement of every note, pad and reverb tail; periodic texture. No whole-track fade creates a silent seam.",
+  "master": {
+    "frames": 2822400,
+    "sampleRate": 44100,
+    "channels": 2,
+    "durationSeconds": 64.0,
+    "finite": true,
+    "peak": 0.4644165,
+    "peakDbFS": -6.662,
+    "rms": 0.1049968,
+    "rmsDbFS": -19.576,
+    "clippedSamples": 0,
+    "boundaryJump": [
+      0.0060425,
+      0.001709
+    ],
+    "adjacentDifferenceP99": 0.0145569,
+    "format": "WAV PCM16 stereo",
+    "bytes": 11289644,
+    "sha256": "f79f13de1426ee53e1a2ca160fdab79e3fed7cfcccbf3b7a04f3cd3a4d9f98f9"
+  },
+  "assets": [
+    {
+      "frames": 2822400,
+      "sampleRate": 44100,
+      "channels": 2,
+      "durationSeconds": 64.0,
+      "finite": true,
+      "peak": 0.44114,
+      "peakDbFS": -7.108,
+      "rms": 0.0997468,
+      "rmsDbFS": -20.022,
+      "clippedSamples": 0,
+      "boundaryJump": [
+        0.0058215,
+        0.0054344
+      ],
+      "adjacentDifferenceP99": 0.0138383,
+      "file": "witness-noir-loop.mp3",
+      "bytes": 1281166,
+      "sha256": "a2e2e12369d503567e53b53e1d7ed31a1529494bf85c75d7027218346a47d661"
+    },
+    {
+      "frames": 2822400,
+      "sampleRate": 44100,
+      "channels": 2,
+      "durationSeconds": 64.0,
+      "finite": true,
+      "peak": 0.4680933,
+      "peakDbFS": -6.593,
+      "rms": 0.1050256,
+      "rmsDbFS": -19.574,
+      "clippedSamples": 0,
+      "boundaryJump": [
+        0.0108293,
+        0.0132746
+      ],
+      "adjacentDifferenceP99": 0.0145833,
+      "file": "witness-noir-loop.ogg",
+      "bytes": 950865,
+      "sha256": "be7988472137eff86b9db5bfcc81f29ac524ef830d601947408329e0dd35e9c3"
+    }
+  ],
+  "verification": "Numerical/decoded-audio checks only. Browser playback and human listening are separate checks."
+}

@@ -11,13 +11,13 @@ async function request(body,expected=200){
  assert.equal(response.status,expected,body.op+' '+(result.error||''));assert.match(response.headers.get('cache-control'),/no-store/);
  return result;
 }
-const tokens=[];
+const tokens=[],credentials=[];
 async function poll(index){return (await request({op:'poll',token:tokens[index]})).room;}
 async function mutate(index,op,extra={}) {const room=await poll(index);return (await request({op,token:tokens[index],revision:room?.revision,requestId:crypto.randomUUID(),...extra})).room;}
 function actual(secret,cat){const order=['coat','hand','item','zone','light'].indexOf(cat);const s=Number(secret.suspectId.slice(1)),p=Number(secret.placeId.slice(1));return order<3?(s>>(2-order))&1:(p>>(4-order))&1;}
 (async()=>{
  const suffix=crypto.randomBytes(2).toString('hex');
- for(let i=0;i<7;i++){const login=await request({op:'login',name:'검증'+suffix+'-'+(i+1)});assert.equal(login.room,null);tokens.push(login.token);}
+ for(let i=0;i<7;i++){const credential={name:'검증'+suffix+'-'+(i+1),password:crypto.randomBytes(20).toString('base64url')};credentials.push(credential);const login=await request({op:'register',...credential});assert.equal(login.room,null);tokens.push(login.token);}
  let room=await mutate(0,'create',{capacity:6});const code=room.code;
  await Promise.all(tokens.slice(1,6).map(token=>request({op:'join',token,code,requestId:crypto.randomUUID()})));
  room=await poll(0);assert.equal(room.members.length,6);
@@ -62,6 +62,7 @@ function actual(secret,cat){const order=['coat','hand','item','zone','light'].in
    }
   }
   assert.equal(room.game.phase,'discussion');
+  if(round===3){for(let i=0;i<6;i++){const before=await poll(i),old=tokens[i];const restored=await request({op:'login',...credentials[i]});assert.notEqual(restored.token,old);assert.equal(restored.room.meId,before.meId);assert.deepEqual(restored.room.game,before.game);tokens[i]=restored.token;await request({op:'poll',token:old},401);}const old=tokens[2];await request({op:'logout',token:old,requestId:crypto.randomUUID()});await request({op:'poll',token:old},401);const back=await request({op:'login',...credentials[2]});tokens[2]=back.token;assert.equal(back.room.code,code);}
   const before=structuredClone(room.game.facts);
   const free=await mutate(suspect,'action',{event:{type:'ADD_NOTE',speakerId:engineIds[criminal],text:'자유 발언 <b>검증</b>'}});
   assert.equal(free.game.notes.at(-1).speakerId,engineIds[suspect]);assert.deepEqual(free.game.facts,before);
@@ -74,6 +75,6 @@ function actual(secret,cat){const order=['coat','hand','item','zone','light'].in
  room=await mutate(0,'restart');assert.equal(room.game,null);assert.ok(room.members.every(m=>!m.ready&&!m.gameId));
  for(let i=0;i<6;i++)await mutate(i,'leave');
  assert.equal(await poll(0),null);
- const result={base,passed:true,sessions:7,simultaneousPlayers:6,rounds:5,serverRequests:measurements.length,maxRequestMs:Math.max(...measurements),averageRequestMs:Math.round(measurements.reduce((a,b)=>a+b,0)/measurements.length),privacy:true,capacityRace:true,protectedEvidence:true,sharedLieBudget:true,guardAndSeal:true,reconnect:true,restart:true};
+ const result={base,passed:true,sessions:7,simultaneousPlayers:6,rounds:5,serverRequests:measurements.length,maxRequestMs:Math.max(...measurements),averageRequestMs:Math.round(measurements.reduce((a,b)=>a+b,0)/measurements.length),privacy:true,capacityRace:true,protectedEvidence:true,sharedLieBudget:true,guardAndSeal:true,reconnect:true,passwordReLogin:true,logoutPreservesSeat:true,restart:true};
  const output=process.env.TEST_REPORT||require('node:path').join(__dirname,'../work/online-http-result.json');fs.mkdirSync(require('node:path').dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify(result,null,2));console.log(result);
 })().catch(e=>{console.error(e.message);process.exit(1)});
