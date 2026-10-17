@@ -15,7 +15,7 @@
     '여섯 번째 날, 봉인 제보의 마지막 기회가 다가온다. 각자의 선택은 각자의 수첩에 남고, 탐정의 수사는 계속된다.',
     '일곱 번째 날이다. 오늘의 수사와 답변 검토를 마치면 탐정은 사건 인물 한 명을 최종 고발한다. 장소·도구·시간의 흔적을 인물과 연결해 보고 마지막 말을 나눈다.'
   ];
-  const EVENT_NAMES = { 'blocked-search': '봉쇄된 원본 열람', 'investigate-pass': '공식 수사 넘김', 'identity-guess': '정체 추정 메모', 'initial-clue': '처음 받은 관찰', 'role-seen': '역할 확인', memory: '기억 복원', report: '봉인 제보', suggest: '정체 추정 메모', guard: '기록 보호', seal: '기록 봉쇄', 'seal-result': '봉쇄 결과', question: '공식 질문', answer: '공식 답변', unknown: '미진술', 'blocked-question': '전달되지 않은 질문', search: '원본 기록 수사', audit: '진술 검증', 'review-audit': '현재 답변 검증', 'round-confirm': '하루의 검토 완료', accusation: '최종 고발', pass: '행동 넘김', 'secret-pass': '개인행동 넘김', note: '자유 발언' };
+  const EVENT_NAMES = { 'blocked-search': '봉쇄된 원본 열람', 'investigate-pass': '공식 수사 넘김', 'identity-guess': '정체 추정 메모', 'initial-clue': '처음 받은 관찰', 'role-seen': '역할 확인', memory: '기억 복원', report: '봉인 제보', suggest: '수사 방향 제안', guard: '기록 보호', seal: '기록 봉쇄', 'seal-result': '봉쇄 결과', question: '공식 질문', answer: '공식 답변', unknown: '미진술', 'blocked-question': '전달되지 않은 질문', search: '원본 기록 수사', audit: '진술 검증', 'review-audit': '현재 답변 검증', 'round-confirm': '하루의 검토 완료', accusation: '최종 고발', pass: '행동 넘김', 'secret-pass': '개인행동 넘김', note: '자유 발언' };
   const PHASES = { reveal: '역할 확인', secret: '개인행동', investigate: '공식 수사', answer: '공식 답변', discussion: '답변·기록 검토', final: '최종 고발', finished: '사건 종료' };
   function create(config) {
     config = config || {};
@@ -24,6 +24,7 @@
     const drafts = config.drafts || Object.create(null), marked = { person: new Set(), place: new Set(), tool: new Set(), time: new Set() };
     let boardTab = 'person', detailSelection = null, sealNotice = null, selectedTab = 'question', replayDay = 'all', replayStep = 0, cueKey = '', storyCase = '', endingShown = '', modalSignature = '', typedKey = '', handles = [];
     const typed = new Set(), readNotices = new Set();
+    const serverActions = new Set(['role-seen', 'memory', 'report-submit', 'identity-guess', 'guard', 'seal', 'suggest', 'secret-pass', 'answer', 'question', 'search', 'audit', 'investigate-pass', 'review-audit', 'round-confirm', 'accuse-submit']);
     const getGame = () => config.getGame?.(), getRoom = () => config.getRoom?.(), pending = () => !!config.isPending?.();
     const current = () => config.getModalKind?.() || '';
     const isMine = g => !!g?.self && g.turnOwnerId === g.self.id;
@@ -33,8 +34,9 @@
     const memberName = (g, id) => (g.phase === 'finished' ? g.reveal?.players || g.players || [] : g.players || []).find(p => p.id === id)?.name || '참가자';
     const day = g => 'DAY-' + String(g.round).padStart(2, '0');
     const read = id => config.read ? config.read(id) : typeof document !== 'undefined' ? document.getElementById(id)?.value || '' : '';
-    const disabled = value => value || pending() ? ' disabled' : '';
-    const button = (action, text, extra, off) => '<button class="btn compact ' + (extra?.includes('data-danger') ? 'danger' : 'outline') + '" data-action="seven-' + action + '"' + (extra || '') + disabled(off) + '>' + text + '</button>';
+    const disabled = (value, action) => value || serverActions.has(action) && pending() ? ' disabled' : '';
+    // Reading and local navigation remain usable while the preceding request settles.
+    const button = (action, text, extra, off) => '<button class="btn compact ' + (extra?.includes('data-danger') ? 'danger' : 'outline') + '" data-action="seven-' + action + '"' + (extra || '') + (serverActions.has(action) && !extra?.includes('data-mutate') ? ' data-mutate' : '') + disabled(off, action) + '>' + text + '</button>';
     const field = (id, label, entries, selected) => '<label class="field"><span>' + esc(label) + '</span><select id="' + id + '" data-draft="' + id + '">' + entries.map(p => '<option value="' + esc(p.id) + '"' + (String(p.id) === String(drafts[id] ?? selected) ? ' selected' : '') + '>' + esc(p.label || p.name) + '</option>').join('') + '</select></label>';
     function catText(id, value) { const c = category(id); return c ? c.label + ' · ' + (c.values[value] ?? '미확인') : '미기록 관찰'; }
     function truth(g, id) {
@@ -53,6 +55,29 @@
       const fact = (g.facts || []).find(f => f.category === id && (Number.isInteger(f.value) || f.allowedValues?.length === 1));
       if (fact) return Number.isInteger(fact.value) ? fact.value : fact.allowedValues[0];
       return (g.statements || []).find(s => s.category === id && s.audited && s.isTrue)?.value;
+    }
+    function questionChoices(g) {
+      return D.CATEGORIES.map(c => {
+        if (Number.isInteger(known(g, c.id))) return null;
+        let values = c.values.map((_, i) => i);
+        for (const fact of (g.facts || []).filter(f => f.category === c.id && f.source !== 'audit')) {
+          if (Array.isArray(fact.allowedValues)) values = values.filter(v => fact.allowedValues.includes(v));
+          else if (Number.isInteger(fact.value)) values = values.filter(v => v === fact.value);
+        }
+        const verdicts = (g.statements || []).filter(s => s.category === c.id && s.audited && typeof s.isTrue === 'boolean').map(s => ({ value: s.value, isTrue: s.isTrue }));
+        for (const fact of (g.facts || []).filter(f => f.category === c.id && f.source === 'audit' && typeof f.isTrue === 'boolean')) {
+          const statement = (g.statements || []).find(s => s.id === fact.statementId);
+          if (statement) verdicts.push({ value: statement.value, isTrue: fact.isTrue });
+        }
+        for (const verdict of verdicts) values = values.filter(v => (v === verdict.value) === verdict.isTrue);
+        return values.length > 1 ? { id: c.id, label: c.label, values: c.values, proposedValues: values } : null;
+      }).filter(Boolean);
+    }
+    function questionSelection(g) {
+      const categories = questionChoices(g), selected = categories.find(c => c.id === drafts['seven-question-category']) || categories[0];
+      if (!selected) return { categories, category: null, proposedValue: null };
+      const proposed = drafts['seven-question-category'] === selected.id ? Number(drafts['seven-question-proposed']) : NaN;
+      return { categories, category: selected, proposedValue: selected.proposedValues.includes(proposed) ? proposed : selected.proposedValues[0] };
     }
     function art(kind, id, label) {
       const index = (kind === 'person' ? D.SUSPECTS : kind === 'place' ? D.PLACES : kind === 'time' ? D.TIMES : D.TOOLS).findIndex(item => item.id === id);
@@ -160,8 +185,16 @@
       if (!detective) return '';
       let html = '<section class="seven-actions"><h3>탐정의 공식 수사 <small>오늘 1회</small></h3>' + directions(g) + '<div class="seven-tabs">' + [['question', '공식 질문'], ['search', '원본 수사'], ['audit', '진술 검증']].map(([id, label]) => button('tab', label, ' data-id="' + id + '" aria-pressed="' + (selectedTab === id) + '"')).join('') + '</div>';
       if (selectedTab === 'question') {
-        const catId = drafts['seven-question-category'] || D.CATEGORIES[0].id, c = category(catId) || D.CATEGORIES[0];
-        html += '<p>아직 풀리지 않은 질문, 봉쇄되거나 유보된 질문도 다시 물을 수 있습니다.</p><div class="form-grid">' + field('seven-question-target', '공식 답변을 요청할 닉네임', g.players.filter(p => p.id !== g.self.id)) + field('seven-question-category', '질문할 관찰 항목', D.CATEGORIES, c.id) + field('seven-question-proposed', '확인하려는 진술', c.values.map((name, id) => ({ id, name }))) + '</div>' + button('question', '이 진술을 공식 질문한다');
+        const selection = questionSelection(g), c = selection.category;
+        if (!c) {
+          delete drafts['seven-question-category']; delete drafts['seven-question-proposed'];
+          html += '<p class="notice">질문할 미확인 항목이 없습니다. 원본 수사나 진술 검증을 선택하거나 오늘의 수사를 넘겨 주세요.</p>';
+        } else {
+          const targets = g.players.filter(p => p.id !== g.self.id);
+          if (!targets.some(p => p.id === drafts['seven-question-target'])) drafts['seven-question-target'] = targets[0]?.id || '';
+          drafts['seven-question-category'] = c.id; drafts['seven-question-proposed'] = String(selection.proposedValue);
+          html += '<p>나의 참 관찰과 확인된 기록으로 이미 아는 항목은 제외했습니다. 미검증 진술은 다른 가정으로 확인할 수 있고, 봉쇄·미진술된 질문도 다시 물을 수 있습니다.</p><div class="form-grid">' + field('seven-question-target', '공식 답변을 요청할 닉네임', targets) + field('seven-question-category', '질문할 관찰 항목', selection.categories, c.id) + field('seven-question-proposed', '확인하려는 진술', c.proposedValues.map(id => ({ id, name: c.values[id] })), selection.proposedValue) + '</div>' + button('question', '이 진술을 공식 질문한다');
+        }
       } else if (selectedTab === 'search') html += '<p>원본 기록의 일부를 확보합니다. 기록 하나가 사건의 전체 정답을 알려 주지는 않습니다.</p><div class="seven-record-options">' + D.RECORDS.map(r => '<article class="seven-action-card"><h4>' + esc(r.label) + '</h4><p>' + esc(sourceDescription(r)) + '</p>' + button('search', '이 원본 기록 수사', ' data-id="' + esc(r.id) + '"') + '</article>').join('') + '</div>';
       else html += '<p>공용 검증 도구 1개를 사용해 공식 진술의 참·거짓만 확인합니다. 정답값은 직접 공개되지 않습니다.</p>' + ((g.statements || []).filter(s => !s.audited).map(s => '<article class="seven-action-card"><p>' + esc(memberName(g, s.speakerId) + ' · ' + catText(s.category, s.value)) + '</p>' + button('audit', '이 공식 진술 검증', ' data-id="' + esc(s.id) + '"', !g.kits) + '</article>').join('') || '<p class="empty">검증할 미확인 진술이 없습니다.</p>');
       return html + button('investigate-pass', '오늘의 공식 수사를 넘긴다') + '</section>';
@@ -290,8 +323,12 @@
       if (!fresh.some(h => !h.done)) return;
       const actions = config.modalHost.querySelector('.case-review-actions');
       if (actions) actions.innerHTML = button('letter-finish', '빠르게 보기') + actions.innerHTML;
-      config.modalHost.querySelectorAll('[data-action="seven-round-confirm"],[data-action="seven-review-audit"],[data-action="seven-notice-continue"],[data-action="seven-ending-continue"]').forEach(el => { el.disabled = true; });
-      Promise.all(fresh.map(h => h.promise)).then(values => { if (values.some(v => v?.cancelled) || typedKey !== signature) return; if (['seven-review', 'seven-notice', 'seven-ending'].includes(current())) { modalSignature = ''; refresh(true); } });
+      config.modalHost.querySelectorAll('[data-action="seven-round-confirm"],[data-action="seven-review-audit"],[data-action="seven-notice-continue"],[data-action="seven-ending-continue"],[data-action="seven-story-continue"]').forEach(el => { el.disabled = true; });
+      Promise.all(fresh.map(h => h.promise)).then(values => {
+        if (values.some(v => v?.cancelled) || typedKey !== signature) return;
+        if (current() === 'seven-story') { const next = config.modalHost.querySelector('[data-action="seven-story-continue"]'); if (next) next.disabled = false; }
+        else if (['seven-review', 'seven-notice', 'seven-ending'].includes(current())) { modalSignature = ''; refresh(true); }
+      });
     }
     function open(kind, title, body) { cancelTypes(); config.openModal?.('seven-' + kind, title, '<div id="seven-window-body">' + body + '</div>'); modalSignature = ''; animate(); }
     function openPersonal() { const g = getGame(); if (!g || g.phase === 'finished') return; if (g.phase === 'discussion' && g.self.role === 'detective') { openReview(); return; } open('personal', isMine(g) ? '나의 차례 · 비밀 수첩' : '나만 보는 비밀 수첩', personal(g, !!config.privateVisible?.())); }
@@ -367,7 +404,11 @@
       }
       if (g.phase === 'answer' && action === 'seven-answer') { const c = category(g.pending?.category), criminal = ['culprit', 'accomplice'].includes(g.self.role), value = d.value === 'unknown' ? null : Number(d.value), actual = criminal ? truth(g, c?.id) : known(g, c?.id); if (g.self.answerOptions?.legalValues ? g.self.answerOptions.legalValues.includes(value) : value === null ? criminal ? g.remainingRefusals > 0 : !Number.isInteger(actual) : c && Number.isInteger(value) && value >= 0 && value < c.values.length && (criminal ? value === actual || g.remainingLies > 0 : value === actual)) event = { type: 'ANSWER', value }; }
       if (g.self.role === 'detective' && g.phase === 'investigate') {
-        if (action === 'seven-question' && category(read('seven-question-category'))) event = { type: 'QUESTION', targetId: read('seven-question-target'), category: read('seven-question-category'), proposedValue: Number(read('seven-question-proposed')) };
+        if (action === 'seven-question') {
+          const c = questionChoices(g).find(c => c.id === read('seven-question-category')), proposedValue = Number(read('seven-question-proposed')), targetId = read('seven-question-target');
+          if (c && c.proposedValues.includes(proposedValue) && g.players.some(p => p.id === targetId && p.id !== g.self.id)) event = { type: 'QUESTION', targetId, category: c.id, proposedValue };
+          else { config.toast?.('질문할 미확인 항목과 확인하려는 진술을 다시 선택해 주세요.'); refresh(true); }
+        }
         if (action === 'seven-search' && D.RECORDS.some(r => r.id === d.id)) event = { type: 'SEARCH', recordId: d.id };
         if (action === 'seven-audit' && g.kits > 0 && g.statements.some(s => s.id === d.id && !s.audited)) event = { type: 'AUDIT', statementId: d.id };
         if (action === 'seven-investigate-pass') event = { type: 'INVESTIGATE', kind: 'pass' };
