@@ -1,0 +1,26 @@
+{
+  "base": "https://the-last-witness-pi.vercel.app",
+  "commit": "41c0ad16c47246a919dbd0c2098524ff4d33c11c",
+  "loginFreePractice": true,
+  "practiceRoomApiRequests": 0,
+  "networkEventsTruncated": false,
+  "startStory": true,
+  "sealedPersonalAutomatic": true,
+  "detectiveMenuAutomatic": true,
+  "replyReviewAutomatic": true,
+  "replyAuditSpendsSharedKit": true,
+  "roundTwoAutomatic": true,
+  "bloodyDayBanner": true,
+  "handwritingFontLoaded": true,
+  "chatDuringInvestigation": true,
+  "consoleErrors": 0,
+  "checkedAt": "2026-10-17T08:21:06.763Z",
+  "mobileChromeEmulation": {
+    "privateHeader": "sticky",
+    "horizontalOverflow": false,
+    "chatCollapsedBySinglePointerClick": true,
+    "height": 844,
+    "width": 390,
+    "actualMobileDeviceTested": false
+  }
+}
