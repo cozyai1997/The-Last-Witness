@@ -9,6 +9,12 @@ async function request(body,expected=200){
  const response=await fetch(base+'/api/room',{method:'POST',headers:{'content-type':'application/json',origin:base},body:JSON.stringify(body),signal:AbortSignal.timeout(20000)});
  const result=await response.json();measurements.push(Date.now()-started);
  assert.equal(response.status,expected,body.op+' '+(result.error||''));assert.match(response.headers.get('cache-control'),/no-store/);
+ const g=result.room?.game;
+ if(g){
+  for(const key of ['replay','replayEvents','replayVersion','replayComplete'])assert.equal(g[key],undefined,'raw replay never enters a room projection');
+  if(g.phase!=='finished')assert.equal(g.reveal,undefined,'end-only replay and answers stay hidden in every active phase');
+  else {assert.equal(g.reveal.replay.version,1);assert.equal(g.reveal.replay.complete,true);assert.equal(g.reveal.replay.source,'recorded');assert.ok(g.reveal.replay.events.every(e=>e.round>=1&&e.round<=g.round));}
+ }
  return result;
 }
 const tokens=[],credentials=[];
@@ -100,7 +106,16 @@ function actual(secret,cat){const order=['coat','hand','item','zone','light'].in
  await mutate(suspect,'action',{event:{type:'ADD_NOTE',text:'최종 지목 전 의견'}});
  room=await mutate(detective,'action',{event:{type:'ACCUSE',...secret}});
  assert.equal(room.game.winner,'investigators');assert.equal(room.status,'finished');assert.equal(room.game.reveal.players.length,6);
+ const replay=room.game.reveal.replay,events=replay.events;
+ assert.equal(events.filter(e=>['question','blocked-question'].includes(e.type)).length,4);
+ assert.equal(events.filter(e=>e.type==='answer').length,3);
+ assert.equal(events.filter(e=>e.type==='answer'&&e.isTrue===false).length,2);
+ assert.equal(events.filter(e=>e.type==='audit').length,1);
+ assert.equal(events.filter(e=>e.type==='seal-result').length,3);
+ assert.equal(events.at(-1).type,'accusation');
+ for(const e of events.filter(e=>e.type==='answer')){assert.equal(e.actualValue,actual(secret,e.category));assert.equal(e.isTrue,e.value===e.actualValue);}
  const final=await Promise.all(tokens.slice(0,6).map((_,i)=>poll(i)));assert.ok(final.every(v=>v.game.winner==='investigators'));
+ assert.ok(final.every(v=>JSON.stringify(v.game.reveal.replay)===JSON.stringify(replay)),'all six players receive the same finished replay');
  const reconnect=await poll(criminal);assert.equal(reconnect.game.self.id,views[criminal].game.self.id);assert.deepEqual(reconnect.game.caseSecret,secret);
  room=await mutate(0,'restart');assert.equal(room.game,null);assert.equal(room.caseId,undefined);assert.ok(room.members.every(m=>!m.ready&&!m.gameId));
  for(let i=0;i<6;i++)await mutate(i,'leave');

@@ -30,8 +30,10 @@
   let practiceCount = 4, practiceRole = 'detective', practiceSnapshot = null;
   let letterHandles = [];
   let activeNotice = null, reviewLetterKey = '';
+  let replayRound = 'all', replayIndex = 0;
   const typedLetters = new Set(), Scene = window.WitnessCasePresentation;
   const U = window.WitnessCaseUI.create({ G, esc, icon, options, category, npc, place, roleLabel, playerName, truth, disabled, fieldValue, drafts, mine, chatSeen: () => chatReadCount });
+  const Replay = window.WitnessReplay.create({ G, esc });
   function practising() { return !!window.WitnessPractice?.active(); }
 
   function sessionGet(key) { try { return sessionStorage.getItem(key) || ''; } catch (_) { return ''; } }
@@ -113,7 +115,35 @@
   }
   function result(g) {
     const r = g.reveal, secret = r.secret, win = g.winner === 'investigators';
-    return shell('<div class="result party-result online-result"><header class="result-header"><span class="result-seal">' + (win ? 'CASE CLOSED' : 'CASE UNSOLVED') + '</span><h1>' + (win ? '수사 진영의 승리' : '범인 진영의 승리') + '</h1><p>' + (win ? '사건 인물과 장소를 모두 맞혔습니다. 탐정·목격자·용의자가 함께 승리합니다.' : '최종 고발이 빗나갔습니다. 범인과 공범이 함께 승리합니다.') + '</p></header><div class="case-solution"><article class="solution-card"><span class="eyebrow">실제 사건 인물</span><div class="solution-portrait"><div class="portrait">' + portrait(G.SUSPECTS.findIndex(p => p.id === secret.suspectId)) + '</div></div><h2>' + npc(secret.suspectId).name + '</h2><p>' + npc(secret.suspectId).bits.map((b, i) => G.CATEGORIES[i].values[b]).join(' · ') + '</p></article><article class="solution-card"><span class="eyebrow">실제 범행 장소</span><div class="result-location place" data-place="' + secret.placeId + '" style="height:160px;margin-top:16px"></div><h2>' + place(secret.placeId).name + '</h2><p>' + place(secret.placeId).bits.map((b, i) => G.CATEGORIES[i + 3].values[b]).join(' · ') + '</p></article></div><div class="banner ' + (win ? 'success' : 'error') + '"><p>탐정의 고발: <b>' + npc(g.accusation.suspectId).name + ' / ' + place(g.accusation.placeId).name + '</b><br>' + g.round + '라운드에서 사건 종료</p></div><div class="divider-title"><h2>모든 역할과 진영 공개</h2></div><div class="result-roles">' + r.players.map(p => '<article class="result-role case-result-role ' + (G.ROLES[p.role].team === g.winner ? 'winner' : 'loser') + '"><div class="role-art" data-role="' + p.role + '" aria-hidden="true"></div><h3>' + esc(p.name) + ' · ' + roleLabel(p.role) + '</h3><p>' + (G.ROLES[p.role].team === 'criminals' ? '범인 진영' : '수사 진영') + '</p>' + '<b class="case-team-result">' + (G.ROLES[p.role].team === g.winner ? 'WIN · 공동 승리' : 'LOSE · 진영 패배') + '</b>' + '</article>').join('') + '</div><div class="divider-title"><h2>공식 진술의 진상</h2></div>' + (g.statements.length ? g.statements.map(s => '<div class="record-card claim"><span class="record-label">R' + s.round + ' · ' + esc(playerName(s.speakerId, g)) + '</span><p>' + factText(s.category, s.value) + '</p><small>' + (s.value === truth(secret, s.category) ? '진실' : '거짓 · 실제 ' + category(s.category).values[truth(secret, s.category)]) + '</small></div>').join('') : '<p class="empty">공식 진술 없이 사건이 끝났습니다.</p>') + '<div class="result-actions">' + (isHost() ? '<button class="btn primary" data-action="restart" data-mutate' + disabled(false) + '>같은 참가자로 새 사건 준비</button>' : '<p class="public-warning">방장이 새 사건 준비를 누르면 함께 대기실로 돌아갑니다.</p>') + '<button class="btn outline" data-action="leave">방 나가기</button></div></div>');
+    return shell('<div class="result party-result online-result"><header class="result-header"><span class="result-seal">' + (win ? 'CASE CLOSED' : 'CASE UNSOLVED') + '</span><h1>' + (win ? '수사 진영의 승리' : '범인 진영의 승리') + '</h1><p>' + (win ? '사건 인물과 장소를 모두 맞혔습니다. 탐정·목격자·용의자가 함께 승리합니다.' : '최종 고발이 빗나갔습니다. 범인과 공범이 함께 승리합니다.') + '</p></header>' + replaySummary(g) + '<div class="case-solution"><article class="solution-card"><span class="eyebrow">실제 사건 인물</span><div class="solution-portrait"><div class="portrait">' + portrait(G.SUSPECTS.findIndex(p => p.id === secret.suspectId)) + '</div></div><h2>' + npc(secret.suspectId).name + '</h2><p>' + npc(secret.suspectId).bits.map((b, i) => G.CATEGORIES[i].values[b]).join(' · ') + '</p></article><article class="solution-card"><span class="eyebrow">실제 범행 장소</span><div class="result-location place" data-place="' + secret.placeId + '" style="height:160px;margin-top:16px"></div><h2>' + place(secret.placeId).name + '</h2><p>' + place(secret.placeId).bits.map((b, i) => G.CATEGORIES[i + 3].values[b]).join(' · ') + '</p></article></div><div class="banner ' + (win ? 'success' : 'error') + '"><p>탐정의 고발: <b>' + npc(g.accusation.suspectId).name + ' / ' + place(g.accusation.placeId).name + '</b><br>' + g.round + '라운드에서 사건 종료</p></div><div class="divider-title"><h2>모든 역할과 진영 공개</h2></div><div class="result-roles">' + r.players.map(p => '<article class="result-role case-result-role ' + (G.ROLES[p.role].team === g.winner ? 'winner' : 'loser') + '"><div class="role-art" data-role="' + p.role + '" aria-hidden="true"></div><h3>' + esc(p.name) + ' · ' + roleLabel(p.role) + '</h3><p>' + (G.ROLES[p.role].team === 'criminals' ? '범인 진영' : '수사 진영') + '</p>' + '<b class="case-team-result">' + (G.ROLES[p.role].team === g.winner ? 'WIN · 공동 승리' : 'LOSE · 진영 패배') + '</b>' + '</article>').join('') + '</div><div class="divider-title"><h2>공식 진술의 진상</h2></div>' + (g.statements.length ? g.statements.map(s => '<div class="record-card claim"><span class="record-label">R' + s.round + ' · ' + esc(playerName(s.speakerId, g)) + '</span><p>' + factText(s.category, s.value) + '</p><small>' + (s.value === truth(secret, s.category) ? '진실' : '거짓 · 실제 ' + category(s.category).values[truth(secret, s.category)]) + '</small></div>').join('') : '<p class="empty">공식 진술 없이 사건이 끝났습니다.</p>') + '<div class="result-actions">' + (isHost() ? '<button class="btn primary" data-action="restart" data-mutate' + disabled(false) + '>같은 참가자로 새 사건 준비</button>' : '<p class="public-warning">방장이 새 사건 준비를 누르면 함께 대기실로 돌아갑니다.</p>') + '<button class="btn outline" data-action="leave">방 나가기</button></div></div>');
+  }
+
+  function replaySummary(g) {
+    if (g.phase !== 'finished' || !g.reveal) return '';
+    const stats = Replay.summary(g);
+    return '<section class="case-self-launch case-replay-launch" aria-label="종료된 사건 복기"><div><small>CASE REPLAY / 사건의 뒷면</small><h2>사건 복기</h2><p class="case-caption">질문 ' + stats.questions + '회 · 거짓 공식 답변 ' + stats.lies + '개 · 당시 진술 검증 ' + stats.verified + '회</p></div><button class="btn outline" data-action="replay-open">' + icon('notebook') + '사건 복기 보기</button></section>';
+  }
+  function openReplay() {
+    const g = game(); if (room?.status !== 'finished' || g?.phase !== 'finished' || !g.reveal || Scene?.busy()) return;
+    if (replayRound !== 'all' && (!Number.isInteger(replayRound) || replayRound < 1 || replayRound > g.round)) replayRound = 'all';
+    const list = Replay.events(g, replayRound);
+    replayIndex = Math.max(0, Math.min(list.length - 1, Number.isInteger(replayIndex) ? replayIndex : 0));
+    openModal('replay', '사건 복기 · 질문과 거짓말의 기록', '<div id="case-replay-body">' + Replay.render(g, { round: replayRound, index: replayIndex }) + '</div>');
+  }
+  function moveReplay(action, data) {
+    const g = game(); if (modalKind !== 'replay' || room?.status !== 'finished' || g?.phase !== 'finished') return;
+    if (action === 'replay-round') { const round = Number(data.round); replayRound = data.round === 'all' || !Number.isInteger(round) || round < 1 || round > g.round ? 'all' : round; replayIndex = 0; }
+    const last = Math.max(0, Replay.events(g, replayRound).length - 1);
+    if (action === 'replay-next') replayIndex += 1;
+    else if (action === 'replay-prev') replayIndex -= 1;
+    else if (action === 'replay-first') replayIndex = 0;
+    else if (action === 'replay-last') replayIndex = last;
+    else if (action === 'replay-step' && Number.isInteger(Number(data.index))) replayIndex = Number(data.index);
+    replayIndex = Math.max(0, Math.min(last, replayIndex));
+    const host = $('#case-replay-body'); if (!host) return;
+    host.innerHTML = Replay.render(g, { round: replayRound, index: replayIndex });
+    const selector = '[data-action="' + action + '"]' + (action === 'replay-round' ? '[data-round="' + replayRound + '"]' : action === 'replay-step' ? '[data-index="' + replayIndex + '"]' : '');
+    const focus = host.querySelector(selector); if (focus && !focus.disabled) focus.focus({ preventScroll: true }); else host.querySelector('#replay-step-title')?.focus({ preventScroll: true });
   }
 
   function captureDrafts() { [app, modalHost].forEach(host => host.querySelectorAll('[data-draft]').forEach(e => { if (e.type !== 'password' && !/password/i.test(e.dataset.draft)) drafts[e.dataset.draft] = e.value; })); }
@@ -142,7 +172,7 @@
     const changed = changedRoom || old?.revision !== nextRoom?.revision || old?.status !== nextRoom?.status || phaseChanged;
     room = nextRoom;
     const resetDrafts = changedRoom || old?.status === 'finished' && nextRoom?.status === 'lobby';
-    if (resetDrafts) { Scene?.cancel(); activeStoryKey = ''; autoCueKey = ''; privacyLocked = true; privateVisible = false; marksS.clear(); marksP.clear(); Object.keys(drafts).forEach(k => { if (!['nickname', 'joinCode'].includes(k)) delete drafts[k]; }); closeModal(); }
+    if (resetDrafts) { Scene?.cancel(); activeStoryKey = ''; autoCueKey = ''; replayRound = 'all'; replayIndex = 0; privacyLocked = true; privateVisible = false; marksS.clear(); marksP.clear(); Object.keys(drafts).forEach(k => { if (!['nickname', 'joinCode'].includes(k)) delete drafts[k]; }); closeModal(); }
     if (phaseChanged) { privateVisible = false; if (modalKind && !activeNotice && !['register', 'logout'].includes(modalKind)) closeModal(); }
     if (room?.status === 'finished') privateVisible = false;
     if (changed || force) render(resetDrafts); else { updatePresence(); updateConnection(); }
@@ -219,7 +249,7 @@
 
   function openModal(kind, title, body) {
     lastFocus = document.activeElement; modalKind = kind;
-    modalHost.innerHTML = '<div class="modal-root ' + (['personal', 'review', 'obstruction', 'practice'].includes(kind) ? 'case-modal-root' : '') + '"><section class="modal" role="dialog" aria-modal="' + (!['personal', 'review', 'obstruction'].includes(kind)) + '" aria-labelledby="modal-title"><header class="modal-head">' + (['personal', 'review'].includes(kind) ? '<button class="case-ledger-launch" data-action="ledger" aria-label="종이와 펜 · 수사기록 열기">' + icon('notebook') + '<span>수사기록</span></button>' : '') + '<div><div class="eyebrow">LAST WITNESS / ONLINE</div><h2 id="modal-title">' + title + '</h2></div><button class="close-btn" data-action="close-modal" aria-label="닫기">×</button></header>' + body + '</section></div>';
+    modalHost.innerHTML = '<div class="modal-root ' + (['personal', 'review', 'obstruction', 'practice', 'replay'].includes(kind) ? 'case-modal-root' : '') + '"><section class="modal" role="dialog" aria-modal="' + (!['personal', 'review', 'obstruction'].includes(kind)) + '" aria-labelledby="modal-title"><header class="modal-head">' + (['personal', 'review'].includes(kind) ? '<button class="case-ledger-launch" data-action="ledger" aria-label="종이와 펜 · 수사기록 열기">' + icon('notebook') + '<span>수사기록</span></button>' : '') + '<div><div class="eyebrow">LAST WITNESS / ONLINE</div><h2 id="modal-title">' + title + '</h2></div><button class="close-btn" data-action="close-modal" aria-label="닫기">×</button></header>' + body + '</section></div>';
     document.body.style.overflow = 'hidden'; modalHost.querySelector('button,select,input,textarea')?.focus();
   }
   function clearPasswordFields() { ['password', 'password-confirm'].forEach(id => { const input = document.getElementById(id); if (input) input.value = ''; }); }
@@ -385,14 +415,14 @@
   async function startPractice() {
     if (pending || practising()) return;
     if (!window.WitnessPractice) { toast('연습 파일을 준비하지 못했습니다. 새로고침해 주세요.'); return; }
-    captureDrafts(); practiceSnapshot = { room, account, nickname, connection, connectionText, restoring }; clearTimeout(pollTimer); generation += 1;
+    captureDrafts(); practiceSnapshot = { room, account, nickname, connection, connectionText, restoring }; clearTimeout(pollTimer); generation += 1; replayRound = 'all'; replayIndex = 0;
     Scene?.cancel(); activeStoryKey = ''; autoCueKey = ''; privateVisible = false; privacyLocked = true; chatOpen = false; chatReadCount = 0; closeModal();
     const data = await window.WitnessPractice.start({ count: practiceCount, role: practiceRole, name: '플레이어', onChange: data => { if (practising()) acceptRoom(data.room); } });
     connection = 'online'; connectionText = '로컬 연습 중'; restoring = false; acceptRoom(data.room, true); schedulePoll();
   }
   async function stopPractice() {
     if (!practising()) return;
-    window.WitnessPractice.stop(); Scene?.cancel(); closeModal(); generation += 1; clearTimeout(pollTimer); activeStoryKey = ''; autoCueKey = ''; privateVisible = false; privacyLocked = true;
+    window.WitnessPractice.stop(); Scene?.cancel(); closeModal(); generation += 1; clearTimeout(pollTimer); activeStoryKey = ''; autoCueKey = ''; replayRound = 'all'; replayIndex = 0; privateVisible = false; privacyLocked = true;
     const saved = practiceSnapshot; practiceSnapshot = null; room = saved?.room || null; account = saved?.account || null; nickname = saved?.nickname || nickname; restoring = saved?.restoring || false; connection = saved?.connection || 'online'; connectionText = saved?.connectionText || '로그인 대기'; chatOpen = false; chatReadCount = 0; render(true); if (token) poll();
   }
 
@@ -402,6 +432,8 @@
     if (action === 'notice-finish') { activeNotice?.handle?.finish?.(); return; }
     if (action === 'notice-continue') { if (activeNotice?.ready) finishNotice(); return; }
     if (action === 'letter-finish') { letterHandles.forEach(h => h.finish?.()); return; }
+    if (action === 'replay-open') { openReplay(); return; }
+    if (['replay-round', 'replay-step', 'replay-prev', 'replay-next', 'replay-first', 'replay-last'].includes(action)) { moveReplay(action, d); return; }
     if (action === 'scroll-login') { $('#online-setup')?.scrollIntoView({ behavior: quality === 'off' ? 'auto' : 'smooth', block: 'center' }); $('#nickname')?.focus({ preventScroll: true }); }
     else if (action === 'auth-mode') { if (!pending) { clearPasswordFields(); authMode = d.mode === 'register' ? 'register' : 'login'; authError = ''; render(); } }
     else if (action === 'login') await submitAuth('login');

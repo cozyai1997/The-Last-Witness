@@ -13,7 +13,7 @@ const Party=require('../lib/party-engine.cjs');
 const publicDir=path.join(__dirname,'../public');
 
 function makeClient(service,index,options={}){
- const listeners={},sessions=options.sessions||new Map(),remembered=options.remembered||new Map(),requests=[];
+ const listeners={},sessions=options.sessions||new Map(),remembered=options.remembered||new Map(),requests=[],timerTasks=new Map();let timerId=0;
  // A small tree DOM: nested window-body updates must be visible in its parent,
  // while input.value stays separate from its serialized HTML attribute.
  const decode=text=>String(text).replace(/&(amp|lt|gt|quot|#39);/g,(_,key)=>({amp:'&',lt:'<',gt:'>',quot:'"','#39':"'"}[key]));
@@ -84,7 +84,7 @@ function makeClient(service,index,options={}){
  const location={href:options.href||'http://localhost/',origin:'http://localhost',pathname:'/'};
  const immediatePresentation={busy:()=>false,showStory:({onDone})=>onDone(),cancel(){},questionText(){return'';},answerText(){return'';},type(element,text,settings={}){element.textContent=text;const result={cancelled:false,text};queueMicrotask(()=>settings.onDone?.(result));return{cancel(){},finish(){},done:true,promise:Promise.resolve(result)};}};
  const window={location,history:{replaceState(){}},crypto:{randomUUID:()=>crypto.randomUUID()},WitnessFX:{init(){},setQuality(){},setPrivate(){},burst(){}},WitnessCasePresentation:options.presentation||immediatePresentation,scrollX:0,scrollY:0,scrollTo(){},addEventListener:(name,callback)=>(listeners['window-'+name]??=[]).push(callback)};
- const context={document,window,URL,AbortController,matchMedia:()=>({matches:false}),sessionStorage:{getItem:key=>sessions.get(key)||null,setItem:(key,value)=>sessions.set(key,value),removeItem:key=>sessions.delete(key)},localStorage:{getItem:key=>remembered.get(key)||null,setItem:(key,value)=>remembered.set(key,value),removeItem:key=>remembered.delete(key)},setTimeout:()=>1,clearTimeout(){},navigator:{clipboard:{writeText:async()=>{}}},console,
+ const context={document,window,URL,AbortController,matchMedia:()=>({matches:false}),sessionStorage:{getItem:key=>sessions.get(key)||null,setItem:(key,value)=>sessions.set(key,value),removeItem:key=>sessions.delete(key)},localStorage:{getItem:key=>remembered.get(key)||null,setItem:(key,value)=>remembered.set(key,value),removeItem:key=>remembered.delete(key)},setTimeout(fn,delay){if(!options.botClock)return 1;const id=++timerId;timerTasks.set(id,{fn,delay});return id;},clearTimeout(id){timerTasks.delete(id);},navigator:{clipboard:{writeText:async()=>{}}},console,
   fetch:async(url,options)=>{
    if(url==='/party-rules.html')return{ok:true,text:async()=>fs.readFileSync(path.join(publicDir,'party-rules.html'),'utf8')};
    const body=JSON.parse(options.body);requests.push(body);
@@ -92,12 +92,12 @@ function makeClient(service,index,options={}){
    catch(error){if(!(error instanceof GameError))throw error;return{ok:false,status:error.status,json:async()=>({error:error.message,code:error.code})};}
   }
  };
- vm.createContext(context);for(const file of ['catalog.js','detective-options.js','case-interface.js'])vm.runInContext(fs.readFileSync(path.join(publicDir,file),'utf8'),context);
+ vm.createContext(context);for(const file of ['catalog.js','detective-options.js','case-interface.js','case-replay.js'])vm.runInContext(fs.readFileSync(path.join(publicDir,file),'utf8'),context);
  if(options.practice){vm.runInContext(fs.readFileSync(path.join(publicDir,'practice-engine.js'),'utf8'),context);window.WitnessPracticeEngine=context.WitnessPracticeEngine;vm.runInContext(fs.readFileSync(path.join(publicDir,'practice.js'),'utf8'),context);assert.ok(window.WitnessPracticeEngine,'real browser practice engine is loaded');assert.ok(window.WitnessPractice,'real browser practice adapter is loaded');}
  let source=fs.readFileSync(path.join(publicDir,'online-app.js'),'utf8');const end=source.lastIndexOf('}());');assert.ok(end>0,'UI IIFE boundary exists');
  source=source.slice(0,end)+'window.audit={act,poll,privacy,acceptRoom,render,setPending:value=>{pending=value;render();},getRoom:()=>room,getPrivate:()=>privateVisible,getAccount:()=>account,getDrafts:()=>drafts,getModalKind:()=>modalKind};'+source.slice(end);vm.runInContext(source,context);
  const html=()=>document.getElementById('app').innerHTML,modal=()=>document.getElementById('modal-host').innerHTML;
- return{document,api:window.audit,practice:window.WitnessPractice,requests,listeners,sessions,remembered,html,modal,combined:()=>html()+modal(),toast:()=>document.getElementById('toast-host').innerHTML};
+ return{document,api:window.audit,practice:window.WitnessPractice,requests,listeners,sessions,remembered,html,modal,combined:()=>html()+modal(),toast:()=>document.getElementById('toast-host').innerHTML,nextBot(){const item=[...timerTasks].find(([,task])=>task.delay>=700&&task.delay<=1400);assert.ok(item,'the real practice adapter scheduled a bot turn');timerTasks.delete(item[0]);item[1].fn();}};
 }
 async function settle(){for(let i=0;i<8;i++)await new Promise(resolve=>setImmediate(resolve));}
 async function act(client,action,dataset={}){await client.api.act(action,{dataset});await settle();}
@@ -395,4 +395,79 @@ test('detective UI: review updates received while handwriting refresh the verdic
  const otherSession=JSON.parse(JSON.stringify(room));otherSession.revision=2;otherSession.game.kits=0;otherSession.game.statements[0].audited=true;otherSession.game.review.verified=true;otherSession.game.review.actualValue=0;otherSession.game.facts.push({id:'fact-1',round:1,category:'item',value:0,source:'audit',statementId:'statement-1'});await loadProjection(client,otherSession);
  assert.equal(original.done,false,'the incoming verdict preserves the current sentence');assert.ok(element.isConnected);assert.equal(client.document.querySelector('.case-review').classList.contains('is-verified-lie'),false,'the old dialog remains intact until its writing finishes');
  await act(client,'letter-finish');assert.equal(client.document.querySelector('.case-review').classList.contains('is-verified-lie'),true,'completion immediately applies the latest authoritative verification');assert.equal(client.document.querySelector('[data-action="review-audit"]'),null,'stale verification controls are removed');assert.equal(client.document.querySelector('[data-action="review-confirm"]').disabled,false);assert.equal(client.api.getRoom().game.kits,0);assert.equal(client.api.getRoom().game.statements[0].value,1);
+});
+
+// The finished case is produced by the real rules engine. A current, completed
+// record and a legacy record without the new journal exercise the same UI entry.
+function replayFinishedRoom(){
+ let state=Party.makeGame(['복기 참가자','<img onerror=1>'],{seed:17,secret:{suspectId:'s0',placeId:'p0'}});
+ const run=event=>{state=Party.act(state,{actorId:Party.turnOwner(state),...event});};
+ while(state.phase==='reveal')run({type:'ROLE_SEEN'});
+ const detective=state.players.find(p=>p.role==='detective'),culprit=state.players.find(p=>p.role==='culprit');
+ const unknown=Party.CATEGORIES.filter(c=>!detective.clues.some(clue=>clue.category===c.id));
+ const valueOf=id=>{const i=Party.CATEGORIES.findIndex(c=>c.id===id);return i<3?Party.SUSPECTS[0].bits[i]:Party.PLACES[0].bits[i-3];};
+ for(let day=1;day<=5;day++){
+  while(state.phase==='secret')run({type:'SECRET_ACTION',kind:'pass'});
+  if(day<=unknown.length){
+   const category=unknown[day-1].id;run({type:'INVESTIGATE',kind:'question',category,targetId:culprit.id,proposedValue:1});
+   run({type:'ANSWER',value:day===1?1-valueOf(category):valueOf(category)});
+   if(day===1)run({type:'REVIEW_RESULT',kind:'audit'});
+  }else run({type:'INVESTIGATE',kind:'pass'});
+  run({type:'REVIEW_RESULT',kind:'confirm'});
+ }
+ run({type:'ACCUSE',suspectId:'s0',placeId:'p0'});
+ const g=JSON.parse(JSON.stringify(Party.publicView(state)));g.self=JSON.parse(JSON.stringify(detective));
+ return{code:'ABC234',caseId:'completed-replay-ui',capacity:2,status:'finished',revision:99,hostId:detective.id,meId:detective.id,members:state.players.map(p=>({id:p.id,gameId:p.id,name:p.name,ready:true,online:true})),game:g};
+}
+function replayPanel(client){const panel=client.document.querySelector('.case-replay');assert.ok(panel,'the finished replay panel is mounted');return panel;}
+
+test('replay UI: ongoing games cannot open replay, including a forged finished reveal',async()=>{
+ const client=makeClient(createService({store:new MemoryStore()}),701),room=projectedRoom('detective');
+ await loadProjection(client,room);assert.equal(client.document.querySelector('[data-action="replay-open"]'),null);
+ await act(client,'replay-open');assert.notEqual(client.api.getModalKind(),'replay');assert.equal(client.document.querySelector('.case-replay'),null);
+ const forged=JSON.parse(JSON.stringify(room));forged.revision++;forged.game.reveal=replayFinishedRoom().game.reveal;
+ await loadProjection(client,forged);await act(client,'replay-open');assert.notEqual(client.api.getModalKind(),'replay','a reveal-shaped object cannot bypass the live phase guard');assert.equal(client.document.querySelector('.case-replay'),null);assert.equal(client.requests.length,0,'replay entry is never a server mutation');
+});
+
+test('replay UI: a finished timeline supports day filters, bounded steps, polling and a safe reopen without changing the case',async()=>{
+ const client=makeClient(createService({store:new MemoryStore()}),702),room=replayFinishedRoom();await loadProjection(client,room);
+ assert.ok(client.document.querySelector('[data-action="replay-open"]'),'the finished result offers replay');
+ const snapshot=JSON.stringify(client.api.getRoom());await act(client,'replay-open');assert.equal(client.api.getModalKind(),'replay');
+ let panel=replayPanel(client);assert.equal(panel.dataset.round,'all');assert.equal(panel.dataset.stepIndex,'0');assert.equal(client.document.querySelector('[data-action="replay-prev"]').disabled,true);
+ assert.equal(client.document.querySelector('img[onerror]'),null,'player names are escaped in the replay');
+ const firstId=client.document.querySelector('[data-replay-step]').dataset.replayStep;
+ await act(client,'replay-next');panel=replayPanel(client);assert.equal(panel.dataset.stepIndex,'1');assert.notEqual(client.document.querySelector('[data-replay-step]').dataset.replayStep,firstId);
+ await act(client,'replay-round',{round:'2'});panel=replayPanel(client);assert.equal(panel.dataset.round,'2');assert.equal(panel.dataset.stepIndex,'0','changing day starts at the first step of that day');
+ const buttons=client.document.querySelectorAll('[data-action="replay-step"]');assert.ok(buttons.length>1,'the question, answer and day markers create multiple reviewable steps');
+ await act(client,'replay-step',{index:String(buttons.length-1)});assert.equal(replayPanel(client).dataset.stepIndex,String(buttons.length-1));assert.equal(client.document.querySelector('[data-action="replay-next"]').disabled,true);
+ await act(client,'replay-next');assert.equal(replayPanel(client).dataset.stepIndex,String(buttons.length-1),'a stale next action cannot overrun the final step');
+ await act(client,'replay-first');assert.equal(replayPanel(client).dataset.stepIndex,'0');await act(client,'replay-last');assert.equal(replayPanel(client).dataset.stepIndex,String(buttons.length-1));
+ const newer=JSON.parse(JSON.stringify(room));newer.revision++;await loadProjection(client,newer);assert.equal(client.api.getModalKind(),'replay','a completed-room poll does not dismiss the replay');assert.equal(replayPanel(client).dataset.round,'2');assert.equal(replayPanel(client).dataset.stepIndex,String(buttons.length-1));
+ await act(client,'close-modal');assert.equal(client.api.getModalKind(),null);assert.equal(client.document.querySelector('.case-replay'),null);await act(client,'replay-open');assert.equal(client.api.getModalKind(),'replay');assert.ok(Number(replayPanel(client).dataset.stepIndex)>=0,'reopening retains a valid selection or begins safely at zero');
+ assert.equal(JSON.stringify(client.api.getRoom()),JSON.stringify(newer),'navigation never edits official statements, verdict, resources or roles');assert.equal(client.requests.length,0,'opening, reading and closing replay send no game API requests');assert.notEqual(snapshot,JSON.stringify(newer),'the only state change was the explicit simulated server revision');
+});
+
+test('replay UI: a host restart or case replacement removes the old timeline and rejects stale navigation',async()=>{
+ const client=makeClient(createService({store:new MemoryStore()}),703),finished=replayFinishedRoom();await loadProjection(client,finished);await act(client,'replay-open');assert.equal(client.api.getModalKind(),'replay');
+ const lobby={...finished,status:'lobby',revision:100,game:null};delete lobby.caseId;await loadProjection(client,lobby);
+ assert.equal(client.api.getModalKind(),null);assert.equal(client.document.querySelector('.case-replay'),null);assert.equal(client.document.querySelector('[data-action="replay-open"]'),null);
+ for(const action of ['replay-next','replay-last','replay-open'])await act(client,action);assert.equal(client.document.querySelector('.case-replay'),null,'stale buttons cannot resurrect a previous result');
+ const next=projectedRoom('detective');next.caseId='new-case-after-restart';next.revision=101;await loadProjection(client,next);await act(client,'replay-open');assert.equal(client.document.querySelector('.case-replay'),null);assert.ok(!client.modal().includes('completed-replay-ui'));assert.equal(client.requests.length,0);
+});
+
+test('replay UI: a legacy finished case remains readable when chronological replay was never recorded',async()=>{
+ const client=makeClient(createService({store:new MemoryStore()}),704),legacy=replayFinishedRoom();delete legacy.game.reveal.replay;delete legacy.game.replay;delete legacy.game.timeline;
+ await loadProjection(client,legacy);await act(client,'replay-open');assert.equal(client.api.getModalKind(),'replay');assert.ok(replayPanel(client));assert.match(client.modal(),/기록|이전|복기/);assert.ok(!client.modal().includes('undefined'));assert.ok(!client.modal().includes('NaN'));assert.equal(client.requests.length,0);
+});
+
+test('replay UI: a login-free computer game reaches its result and opens replay without contacting the room API',async t=>{
+ const client=makeClient(createService({store:new MemoryStore()}),705,{practice:true,botClock:true});t.after(()=>client.practice.stop());
+ await act(client,'practice-setup');await act(client,'practice-count',{count:'2'});await act(client,'practice-role',{role:'detective'});await act(client,'practice-start');
+ for(let guard=0;guard<100&&client.api.getRoom().status!=='finished';guard++){
+  const g=client.api.getRoom().game;
+  if(g.turnOwnerId!==g.self.id){client.nextBot();await settle();continue;}
+  let event;if(g.phase==='reveal')event={type:'ROLE_SEEN'};else if(g.phase==='secret')event={type:'SECRET_ACTION',kind:'pass'};else if(g.phase==='investigate')event={type:'INVESTIGATE',kind:'pass'};else if(g.phase==='discussion')event={type:'REVIEW_RESULT',kind:'confirm'};else if(g.phase==='final')event={type:'ACCUSE',...Party.candidates(g)[0]};else assert.fail('unexpected human practice phase '+g.phase);
+  const data=await client.practice.request({op:'action',event});client.api.acceptRoom(data.room,true);await settle();
+ }
+ assert.equal(client.api.getRoom().status,'finished');assert.equal(client.api.getRoom().game.round,5);assert.equal(client.api.getAccount(),null);assert.ok(client.document.querySelector('[data-action="replay-open"]'));await act(client,'replay-open');assert.equal(client.api.getModalKind(),'replay');assert.ok(replayPanel(client));await act(client,'replay-last');await act(client,'close-modal');await act(client,'practice-exit');assert.equal(client.api.getRoom(),null);assert.equal(client.document.querySelector('.case-replay'),null);assert.equal(client.requests.length,0,'the complete five-day practice and replay flow stays local');
 });

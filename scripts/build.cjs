@@ -14,7 +14,7 @@ fs.writeFileSync(path.join(root,'public/catalog.js'),script);
 const engineSource = fs.readFileSync(path.join(root,'lib/party-engine.cjs'),'utf8');
 if(!engineSource.includes('root.WitnessParty = api;')) throw new Error('Practice engine UMD boundary changed');
 fs.writeFileSync(path.join(root,'public/practice-engine.js'),engineSource.replace('root.WitnessParty = api;','root.WitnessPracticeEngine = api;'));
-for(const file of ['index.html','online-app.js','online.css','fx.js','style.css','assets.css','party.css','party-assets.css','party-rules.html','bgm.js','practice.js','practice-engine.js','detective-options.js','case-interface.js','case-interface.css','case-presentation.js','case-presentation.css','fonts/handwriting.woff2','fonts/OFL.txt','audio/witness-noir-loop.mp3']) {
+for(const file of ['index.html','online-app.js','online.css','fx.js','style.css','assets.css','party.css','party-assets.css','party-rules.html','bgm.js','practice.js','practice-engine.js','detective-options.js','case-replay.js','case-replay.css','case-interface.js','case-interface.css','case-presentation.js','case-presentation.css','fonts/handwriting.woff2','fonts/OFL.txt','audio/witness-noir-loop.mp3']) {
   if(!fs.existsSync(path.join(root,'public',file))) throw new Error('Missing public file: '+file);
 }
 if(fs.existsSync(path.join(root,'public','party-engine.js'))) throw new Error('Server engine must stay outside public');

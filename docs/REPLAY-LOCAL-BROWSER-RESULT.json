@@ -1,0 +1,27 @@
+{
+  "version": "3.4.0",
+  "base": "http://127.0.0.1:4194/",
+  "checkedAt": "2026-10-17T09:10:36.7069361Z",
+  "browser": "Desktop Chrome",
+  "mode": "Real login-free two-player practice, human culprit and computer detective",
+  "rounds": 5,
+  "questions": 3,
+  "originalLies": 2,
+  "audits": 1,
+  "replayEvents": 22,
+  "endingAndReplayOpened": true,
+  "questionOriginalAnswerTruthComparison": true,
+  "lieBorder": "rgb(220, 105, 86)",
+  "dayFilterAndPreviousNextAndLast": true,
+  "lastBoundaryDisabled": true,
+  "reopenPreservesDayAndStep": true,
+  "consoleWarningsOrErrors": 0,
+  "mobileChromeEmulation": {
+    "stackedLayout": true,
+    "horizontalOverflow": false,
+    "controlsAndScrollableTimelineVisible": true,
+    "height": 844,
+    "width": 390
+  },
+  "scopeLimit": "No actual-phone, Safari or Firefox check. Full no-API practice assertions are in automated integration tests."
+}
