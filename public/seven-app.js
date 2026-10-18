@@ -24,7 +24,7 @@
     const drafts = config.drafts || Object.create(null), marked = { person: new Set(), place: new Set(), tool: new Set(), time: new Set() };
     const actions = config.actions || (typeof globalThis !== 'undefined' ? globalThis.WitnessSevenActions : null);
     let boardTab = 'person', mapView = false, detailSelection = null, actionNotebook = null, privatePane = 'actions', secretPane = 'memory', sealNotice = null, selectedTab = 'question', replayDay = 'all', replayStep = 0, cueKey = '', storyCase = '', endingShown = '', modalSignature = '', typedKey = '', handles = [];
-    const typed = new Set(), readNotices = new Set();
+    const typed = new Set(), readNotices = new Set(), typeKeys = new WeakMap();
     const serverActions = new Set(['role-seen', 'memory', 'report-submit', 'identity-guess', 'guard', 'seal', 'suggest', 'free-suggest', 'offer-testimony', 'ready', 'secret-pass', 'answer', 'question', 'search', 'audit', 'investigate-pass', 'review-audit', 'round-confirm', 'accuse-submit']);
     const getGame = () => config.getGame?.(), getRoom = () => config.getRoom?.(), pending = () => !!config.isPending?.();
     const current = () => config.getModalKind?.() || '';
@@ -101,7 +101,17 @@
     }
     function art(kind, id, label) {
       const index = (kind === 'person' ? D.SUSPECTS : kind === 'place' ? D.PLACES : kind === 'time' ? D.TIMES : D.TOOLS).findIndex(item => item.id === id);
-      return '<div class="seven-art seven-art-' + kind + '" data-sprite-index="' + Math.max(0, index) + '" role="img" aria-label="' + esc(label) + '">' + (kind === 'time' ? '<span class="seven-time-overlay">' + esc(D.TIMES[index]?.name || '') + '</span>' : '') + '</div>';
+      const spriteIndex = Math.max(0, index), extraPortrait = kind === 'person' && spriteIndex >= 8;
+      const atlas = kind === 'person'
+        ? { file: extraPortrait ? 'portraits-v4.webp' : 'suspects-atlas.webp', width: extraPortrait ? 1254 : 1774, height: extraPortrait ? 1254 : 887, columns: extraPortrait ? 2 : 4, rows: 2 }
+        : { file: ({ place: 'locations-v4-12.webp', time: 'times-v4-12.webp' })[kind] || 'tools-v4-12.webp', width: 1448, height: 1086, columns: 4, rows: 3 };
+      const cell = extraPortrait ? spriteIndex - 8 : spriteIndex, width = atlas.width / atlas.columns, height = atlas.height / atlas.rows;
+      const x = cell % atlas.columns * width, y = Math.floor(cell / atlas.columns) * height, viewBox = [x, y, width, height].join(' ');
+      // Preserve the source cell's geometry instead of stretching each atlas axis
+      // to fit the frame. The inner viewport clips this cell before the outer SVG
+      // letterboxes it, so adjacent atlas cells cannot enter the empty margins.
+      const image = '<svg class="seven-art-image" viewBox="' + viewBox + '" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false" width="100%" height="100%"><svg x="' + x + '" y="' + y + '" width="' + width + '" height="' + height + '" viewBox="' + viewBox + '" overflow="hidden"><image href="images/' + atlas.file + '" width="' + atlas.width + '" height="' + atlas.height + '"/></svg></svg>';
+      return '<div class="seven-art seven-art-' + kind + '" data-sprite-index="' + spriteIndex + '" role="img" aria-label="' + esc(label) + '" style="--seven-art-ratio:' + width / height + '">' + image + (kind === 'time' ? '<span class="seven-time-overlay">' + esc(D.TIMES[index]?.name || '') + '</span>' : '') + '</div>';
     }
     function traits(item, group) {
       return D.CATEGORIES.filter(c => c.group === group && Number.isInteger(item[c.id])).map(c => '<span>' + esc(c.label) + ' <b>' + esc(c.values[item[c.id]]) + '</b></span>').join('');
@@ -477,7 +487,7 @@
       const g = getGame(), signature = current() === 'seven-notice' ? sealNotice?.key || '' : (config.caseId?.() || '') + ':' + g?.round + ':' + current() + ':' + JSON.stringify(g?.review || g?.pending || {});
       typedKey = signature;
       const fresh = [];
-      config.modalHost.querySelectorAll('[data-seven-typed]').forEach(el => { const text = el.textContent, key = signature + ':' + text; if (typed.has(key)) return; const h = config.scene.type(el, text, { speed: 22 }); handles.push(h); fresh.push(h); Promise.resolve(h.promise).then(out => { if (!out?.cancelled) typed.add(key); }); });
+      config.modalHost.querySelectorAll('[data-seven-typed]').forEach(el => { const text = el.textContent, key = signature + ':' + text; if (typed.has(key)) return; const h = config.scene.type(el, text, { speed: 22 }); typeKeys.set(h, key); handles.push(h); fresh.push(h); Promise.resolve(h.promise).then(out => { if (!out?.cancelled) typed.add(key); }); });
       if (!fresh.some(h => !h.done)) return;
       const actions = config.modalHost.querySelector('.case-review-actions');
       if (actions) actions.innerHTML = button('letter-finish', '빠르게 보기') + actions.innerHTML;
@@ -527,7 +537,18 @@
       if ((canPrepare(g) || isMine(g) && !(modernFlow(g) && g.phase === 'secret')) && key !== cueKey) { cueKey = key; actionNotebook = null; privatePane = 'actions'; if (g.phase === 'discussion') openReview(); else openPersonal(); }
     }
     function reset() { cancelTypes(); cueKey = ''; storyCase = ''; endingShown = ''; modalSignature = ''; boardTab = 'person'; mapView = false; detailSelection = null; actionNotebook = null; privatePane = 'actions'; secretPane = 'memory'; sealNotice = null; readNotices.clear(); replayDay = 'all'; replayStep = 0; Object.values(marked).forEach(set => set.clear()); }
-    function privacy() { cancelTypes(); if (['seven-personal', 'seven-notice', 'seven-ending'].includes(current())) config.closeModal?.(); }
+    function privacy() {
+      // Public reading stays open on blur. Finish through the normal completion
+      // path so its controls unlock; cancelling would strand a partial paragraph.
+      if (['seven-review', 'seven-story'].includes(current())) {
+        // The parent also conceals private state and may render synchronously on
+        // blur, before completion promises settle. Keep that render from typing
+        // this already finished public paragraph again.
+        handles.forEach(h => { h.finish?.(); if (h.done && typeKeys.has(h)) typed.add(typeKeys.get(h)); });
+        return;
+      }
+      cancelTypes(); if (['seven-personal', 'seven-notice', 'seven-ending'].includes(current())) config.closeModal?.();
+    }
     async function handle(action, data) {
       if (!action.startsWith('seven-')) return false;
       const g = getGame(), d = data || {};

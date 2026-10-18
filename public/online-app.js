@@ -541,7 +541,19 @@
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && event.target.id === 'chat-text') { event.preventDefault(); act('send-note'); }
     else if (event.key === 'Enter' && ['nickname', 'password', 'password-confirm'].includes(event.target.id)) { event.preventDefault(); act(modalKind === 'register' ? 'upgrade-submit' : authMode === 'register' ? 'register' : 'login'); }
     else if (event.key === 'Enter' && event.target.id === 'join-code') { event.preventDefault(); act('join'); }
-    if (event.key === 'Tab' && modalKind && !['personal', 'review', 'obstruction', 'seven-personal', 'seven-review'].includes(modalKind)) { const list = [...modalHost.querySelectorAll('button:not(:disabled),select,input,textarea,a[href]')], first = list[0], last = list.at(-1); if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); } }
+    if (event.key === 'Tab' && modalKind && !['personal', 'review', 'obstruction', 'seven-personal', 'seven-review'].includes(modalKind)) {
+      const list = [...modalHost.querySelectorAll('button,select,input,textarea,a[href],summary,[tabindex]')].filter(el => {
+        if (el.disabled || el.tabIndex < 0 || el.closest('[hidden],[inert],[aria-hidden="true"]')) return false;
+        for (let parent = el.parentElement; parent && parent !== modalHost; parent = parent.parentElement) {
+          if (parent.tagName === 'DETAILS' && !parent.open && !parent.querySelector('summary')?.contains(el)) return false;
+        }
+        return !el.getClientRects || el.getClientRects().length > 0;
+      });
+      const first = list[0], last = list.at(-1), active = document.activeElement;
+      if (list.length && (event.shiftKey && active === first || !event.shiftKey && active === last || !list.includes(active))) {
+        event.preventDefault(); (event.shiftKey ? last : first).focus();
+      }
+    }
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) privacy(); else { poll(); pumpCaseCues(); } schedulePoll(); });
   window.addEventListener('focus', () => pumpCaseCues());
