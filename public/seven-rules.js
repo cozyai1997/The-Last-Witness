@@ -1,0 +1,38 @@
+(function (root, factory) {
+  'use strict';
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  if (root) root.WitnessSevenRules = api;
+}(typeof window !== 'undefined' ? window : globalThis, function () {
+  'use strict';
+  const sections = [['goal','게임목표'],['components','구성'],['setup','준비'],['play','진행'],['round-end','라운드종료'],['win','승리조건']];
+  const packs = ['탐정 1 · 범인 1','탐정 1 · 범인 1 · 목격자 1','탐정 1 · 범인 1 · 목격자 1 · 용의자 1','탐정 1 · 범인 1 · 목격자 2 · 용의자 1','탐정 1 · 범인 1 · 목격자 2 · 용의자 1 · 공범 1'];
+  const section = (id, title, body) => '<section id="party-rule-' + id + '" class="party-rule-section" aria-labelledby="party-rule-' + id + '-title"><h2 id="party-rule-' + id + '-title">' + title + '</h2>' + body + '</section>';
+  const table = rows => '<div class="party-rule-table-wrap"><table><tbody>' + rows.map(([label,text]) => '<tr><th scope="row">' + label + '</th><td>' + text + '</td></tr>').join('') + '</tbody></table></div>';
+  function render(game) {
+    // The default is a new 4.2 case. Saved cases use their actual two independent
+    // version flags; no private clue, nickname, answer or coordinate is read.
+    const current = !game || game.detectiveVersion === 2, simultaneous = !game || game.flowVersion === 2;
+    const phase = simultaneous ? '동시 비밀 준비' : '순서대로 개인행동';
+    const daily = current ? '공식 질문' : '공식 수사';
+    const intro = '<p class="notice"><strong>' + (current ? '질문은 하루 1회 · 진술 검증은 사건 전체 2회' : '공식 수사는 하루 1회 · 공동 키트 1개') + '</strong><br>' + phase + ' → 탐정의 ' + daily + ' → 답변·기록 검토 → 하루 확인. 이 설명은 현재 사건의 저장된 규칙에 맞춰 표시됩니다.</p>';
+    const goal = '<p>2~6명이 <strong>DAY 1부터 DAY 7까지</strong> 같은 사건을 조사합니다. 탐정(D)은 DAY 7의 수사와 검토를 마친 뒤 <strong>인물 한 명</strong>을 최종 고발합니다. 장소·도구·시간은 인물을 추리하는 증거이며 최종 고발 입력은 인물 하나입니다.</p><p>역할과 사건 인물은 별도로 무작위 배정됩니다. 각자는 인물 12명 중 서로 다른 한 명을 맡고, <strong>범인(C) 역할 참가자의 인물이 실제 진범</strong>입니다. 탐정만 공개 역할이며 나머지는 닉네임으로 보입니다. 누구의 인물인지와 미배정 여부는 종료 전 비공개입니다.</p><p>탐정·목격자(W)는 진범 고발을, 범인·공범(A)은 진범이 고발되는 것을 피하는 일을 목표로 합니다. 용의자(S)는 진영과 별도로 정체를 회복하고 진범을 봉인 제보하는 <strong>독립 개인 역할</strong>입니다.</p>';
+    const components = '<p><strong>인물 12명·장소 12곳·도구 12종·시간대 12개</strong>를 수첩에서 대조합니다. 시간 카드는 사건 당일 18:00–21:00의 15분 구간이며, 사건 이후의 수사일 DAY 1~7과 다릅니다. 연결 자료의 출입·취급·근무 범위는 가능성이지 실제 방문이나 사용의 확정이 아닙니다.</p>' + table(packs.map((pack,i) => [(i+2)+'명',pack])) + table([
+      [daily,current ? '질문은 하루 1회. 질문 넘기기도 당일 기회를 마칩니다.' : '질문·원본 수사·과거 진술 검증 중 하나를 하루 한 번 선택합니다. 수사 넘기기도 가능합니다.'],
+      ['진술 검증',current ? '진술 검증은 사건 전체 2회. 과거 진술과 방금 답변이 같은 한도를 공유하며 매일 회복되지 않습니다.' : '사건 전체 공동 키트 1개. 과거 진술 또는 방금 답변 검증에 같은 키트를 사용합니다.'],
+      ['공식 거짓 답변 / 답변 유보','C·A 거짓 답변 합계 2회 / 답변 유보 합계 1회. 서로 별도 자원입니다.'],
+      ['기록 봉쇄 / 보호','봉쇄 C 2회 · A 1회. 범인 진영은 하루 한 항목만 봉쇄합니다. 보호는 S 1회입니다.'],
+      ['S 기억 복원 / 봉인 제보','기억 복원 2회: 본인 후보 3명 → 2명 → 1명. 봉인 제보는 DAY 1~6 중 단 한 번입니다.']
+    ]);
+    const initial = current ? '<p>탐정은 전체 9개 항목에서 <strong>무작위로 고른 서로 다른 2개 항목의 참인 초기 답</strong>을 받습니다. 성별·손·근무·출입 권한·구역·진입로·카메라·도구·시간이 모두 대상입니다. 목격자는 일부 참 관찰만 알며 완전한 사건 정답을 받지 않습니다.</p>' : '<p>이 사건의 탐정은 <strong>인물 관찰 한 개와 장소 관찰 한 개</strong>를 초기 단서로 받습니다. 목격자는 일부 참 관찰만 알며 원본 기록·질문·검증을 함께 대조해야 합니다.</p>';
+    const setup = '<ol><li>각자의 기기로 로그인하고 초대 링크 또는 방 코드로 같은 방에 입장합니다. 2명 이상 현재 참가자 모두 준비하면 방장이 시작합니다. 방장과 탐정은 별개입니다.</li><li>내 화면에서 역할·목표를 확인합니다. D·W·C·A는 자신의 사건 인물을 알고, C·A는 서로의 닉네임과 사건 진상도 압니다.</li><li>S는 자기 인물을 모른 채 본인 정체 후보 세 명을 받습니다. <strong>본인 후보이지 진범 후보가 아니며 진범이 포함된다는 보장은 없습니다.</strong> 정체 회복과 관찰은 본인에게만 보입니다.</li></ol>' + initial + '<p>다른 사람의 비밀 카드는 내 화면에 제공되지 않습니다. 개인 창은 화면을 떠나면 다시 가려집니다. 온라인은 같은 계정으로 다시 로그인해 사건을 이어갈 수 있고, 로그인 없는 컴퓨터 연습은 새로고침하거나 종료하면 사라집니다.</p>';
+    const preparation = simultaneous ? '<p>매일 <strong>동시 비밀 준비</strong>를 합니다. 다른 사람을 기다리지 않고 제한 능력 하나를 사용하거나 준비 완료를 선택하세요. 모두 준비하면 탐정의 수사가 열립니다. 공개되는 것은 준비 완료 여부뿐이며 선택한 비밀 행동은 공개하지 않습니다.</p><p>역할 확인 후 사건 진행 중 수사 제안·증언 신청·S 정체 메모를 언제든 남길 수 있으며 <strong>그날 준비나 질문 기회를 쓰지 않습니다.</strong> 증언 신청은 제안일 뿐이고 탐정이 공식 질문하고 답변자가 답해야 공식 진술이 됩니다.</p>' : '<p>매일 참가자들이 <strong>순서대로 개인행동</strong>을 한 번씩 마친 뒤 탐정이 수사합니다. 내 차례에 능력 하나를 사용하거나 행동을 넘기세요. 수사 제안과 <strong>S 정체 추정 메모도 개인행동 1회</strong>를 사용하며 정체 확인이나 결백 인증이 되지 않습니다.</p>';
+    const secret = '<ul><li><strong>C·A 기록 봉쇄:</strong> 항목을 미리 골라 그날 해당 항목의 질문' + (current ? '' : '·원본 수사') + '을 막습니다. 진술 검증은 막지 못하며 이미 공개된 증거를 지우거나 바꾸지 않습니다.</li><li><strong>S 기억 복원:</strong> 하루 개인행동 하나로 본인 후보를 3→2명, 다음 복원으로 2→1명으로 줄입니다. 기억 복원은 봉쇄할 수 없습니다.</li><li><strong>S 기록 보호:</strong> 미리 고른 항목과 그날 봉쇄가 같으면 봉쇄를 무시합니다. 사건 전체 한 번입니다.</li><li><strong>S 봉인 제보:</strong> DAY 1~6의 본인 개인행동에서 진범으로 생각하는 인물 한 명과 이유를 제출합니다. <strong>DAY 6 본인의 ' + (simultaneous ? '준비 완료' : '개인행동 종료') + '가 마감</strong>입니다. 같은 날 다른 사람을 기다리는 중이거나 DAY 7에는 제출할 수 없습니다. 자기·미배정 인물도 같은 방식으로 접수하며 정답 여부를 응답하지 않습니다. 제출 후 수정·철회·재제출할 수 없습니다.</li></ul><p>기억 복원과 제보는 각각 그날 개인행동 하나이므로 같은 날 함께 할 수 없습니다. 기억 복원을 마치지 않아도 제보할 수 있습니다.</p>';
+    const investigate = current ? '<h3>공식 질문과 별도의 진술 판별</h3><p>탐정은 본인을 제외한 닉네임 한 명에게 미확인 항목을 <strong>하루 한 번</strong> 질문합니다. 봉쇄·기억 불명·답변 유보로 끝나도 당일 질문 기회를 사용합니다. 다음 날 다시 질문할 수 있습니다. <strong>원본 조사 행동은 제공하지 않습니다.</strong></p><p>진술 검증은 사건 전체 두 번이며 <strong>질문 기회를 소비하지 않고 하루를 끝내지도 않습니다.</strong> 질문 전 또는 답변 검토 중에 과거 진술이나 방금 답변을 판별할 수 있습니다. 답변 대기 중에는 사용할 수 없습니다. 같은 날 질문 전·후에 한 번씩 쓰는 것도 가능합니다.</p><p>이미 검증했거나 초기 답·공식 기록으로 판정할 수 있는 진술은 대상에서 빠집니다. 검증은 선택한 진술의 참·거짓만 확정하며 정답 좌표 전체를 알려 주지 않습니다.</p>' : '<h3>하루 공식 수사와 공동 키트</h3><p>탐정은 <strong>질문·원본 수사·과거 진술 검증 중 하나</strong>를 공식 수사 하루 1회로 선택합니다. 원본 수사는 일부 참 기록을 확보하며 같은 원본은 다시 조사하지 않고 열람합니다. 봉쇄된 원본이나 미진술된 질문은 다음 날 재시도할 수 있습니다.</p><p><strong>공동 키트 1개</strong>는 사건 전체에서 공유하며 과거 진술 또는 방금 공식 답변의 참·거짓 검증에 사용합니다. 과거 진술 검증은 그날 공식 수사를 사용하고, 방금 답변은 결과 검토 중 같은 키트로 검증할 수 있습니다. 사용한 키트는 다음 날 회복되지 않습니다.</p>';
+    const answers = '<h3>답변과 자유 대화의 차이</h3><p>' + (current ? 'W는 아는 참만 답하고 모르면 기억 불명으로 답합니다. S는 단서·정체 회복과 무관하게 항상 기억 불명으로 답합니다.' : 'W와 S도 확실히 아는 참만 답하고 모르면 미진술합니다.') + ' C·A는 참 또는 공동 거짓말 한도 안의 거짓을 답할 수 있고, 답변 유보는 둘이 합쳐 한 번입니다. 기억 불명·미진술·유보는 참·거짓 진술을 만들지 않습니다.</p><p>공식 증거는 변경되지 않습니다. 검증 전 공식 진술은 참과 거짓 모두 가능하며 원문과 발언자가 남습니다. <strong>자유 채팅·역할 주장·제안·정체 추정·직접 표시한 X는 공식 인증이나 참 증거가 아닙니다.</strong> 회색 카드와 붉은 X에서 공식 제외와 내 추정 메모를 구분하세요. 자유 대화의 진위는 자동 판정하지 않습니다.</p>';
+    const round = '<p>탐정이 답변·기록 검토를 확인하면 DAY 1~6은 다음 날 ' + phase + '로 넘어갑니다. 당일 봉쇄·보호와 준비 상태는 해제되지만 공식 기록·능력 사용량·검증·거짓말·유보·기억·제보는 이어집니다.</p><p><strong>DAY 7도 준비와 ' + daily + ' 한 번 및 검토를 마쳐야 최종 고발</strong>로 이동합니다. 넘기기도 당일 기회 완료로 셉니다. 조기 고발과 DAY 8은 없으며 고발을 확정하면 되돌릴 수 없습니다.</p>';
+    const win = table([['D·W 진영 승리','최종 고발 인물이 실제 진범과 일치합니다.'],['C·A 진영 승리','최종 고발 인물이 실제 진범과 다릅니다.'],['S 개인 패배','본인의 실제 인물이 최종 고발되면 제보의 정오와 무관하게 최우선으로 개인 패배합니다.'],['S 개인 승리','본인이 고발되지 않았고 봉인 제보 인물이 진범과 일치합니다.'],['S 생존·목표 미달','본인이 고발되지 않았지만 오제보 또는 미제보입니다.']]) + '<p>정확한 DAY 1~4 제보로 개인 승리하면 선제 추적으로 기록합니다. DAY 5~6 정확 제보도 개인 승리입니다. <strong>S는 진영 판정과 독립적이므로 범인 진영과 동시 승리할 수 있습니다.</strong> 제보가 맞아도 본인이 고발되면 개인 패배가 우선합니다.</p><p>종료 후에만 전체 역할·사건 인물 배정, 실제 인물·장소·도구·시간, 봉인 제보와 비밀 행동을 공개합니다. 사건 복기는 당시 원래 답변과 검증 시점을 보존합니다. 전체 결과를 읽은 뒤 방장이 새 사건 준비를 누르면 새 배정을 준비합니다.</p>';
+    return '<div class="seven-rules" data-rules-version="4" data-detective-version="' + (current ? 2 : 1) + '" data-flow-version="' + (simultaneous ? 2 : 1) + '"><nav class="party-rule-nav" aria-label="게임 규칙 바로가기">' + sections.map(([id,label]) => '<button type="button" data-action="rule-jump" data-id="' + id + '">' + label + '</button>').join('') + '</nav>' + intro + section('goal','게임목표',goal) + section('components','구성',components) + section('setup','준비',setup) + section('play','진행',preparation+secret+investigate+answers) + section('round-end','라운드종료',round) + section('win','승리조건',win) + '</div>';
+  }
+  return Object.freeze({ render });
+}));
