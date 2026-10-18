@@ -79,3 +79,7 @@ PowerShell에서는 먼저 $env:BASE_URL을 설정한다. 검사는 새 임시 �
 [저장소 SQL](scripts/storage.sql)의 __SECRET_SHA256__를 서버 비밀값의 SHA-256 해시로 바꾼다. 원문은 서버의 WITNESS_STORE_SECRET에 둔다. 운영에서 저장소 설정이 빠지면 메모리로 조용히 전환하지 않는다. 기존 저장소를 새 규칙 때문에 초기화하거나 마이그레이션하지 않는다.
 
 데이터는 비공개 스키마에 저장하고 직접 접근 권한과 RLS를 제한한다. 공개 RPC는 서버 비밀 검증과 버전 비교를 거친다. [Supabase Data API 보안](https://supabase.com/docs/guides/api/securing-your-api), [데이터베이스 함수](https://supabase.com/docs/guides/database/functions)를 참고한다. 로컬 검사·빌드·배포 준비·실제 운영 수락은 [7일 검증 기록](docs/SEVEN-VERIFICATION.md)에 별도로 기록한다.
+
+## GUI 개편 4.3
+
+청록 상황실, 익명 참가자, 인물·장소·도구·시간의 12개 카드, 종이 심문 창과 하단 메뉴를 적용했다. 게임 규칙은 4.2와 기존 저장 사건의 규칙을 유지한다. 생성 재질 3종의 원본·프롬프트·매핑과 전체 292개 테스트, 보안 20개·인증 5개 검사 결과는 [GUI 개편 검증 기록](docs/GUI-REMAKE-2026-10-18.md)에 있다. Edge 모바일 뷰포트 확인과 물리 기기 검증은 구별하며, 전체 브라우저 진행·운영 배포 확인 상태도 해당 기록에서 확인한다.

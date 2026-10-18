@@ -43,7 +43,7 @@
   function rememberedName() { try { return localStorage.getItem(NAME_KEY) || ''; } catch (_) { return ''; } }
   function rememberName(name) { nickname = name; sessionSet(NAME_KEY, name); try { localStorage.setItem(NAME_KEY, name); } catch (_) {} }
   function esc(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-  function icon(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (iconPaths[name] || iconPaths.file) + '</svg>'; }
+  function icon(name) { if (window.WitnessIcons) return window.WitnessIcons.svg(({file:'records',eye:'settings',copy:'records',lab:'scale',question:'search'})[name] || name); return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (iconPaths[name] || iconPaths.file) + '</svg>'; }
   function category(id) { return G.CATEGORIES.find(c => c.id === id); }
   function npc(id) { return G.SUSPECTS.find(p => p.id === id); }
   function place(id) { return G.PLACES.find(p => p.id === id); }
@@ -63,7 +63,11 @@
   function toast(message) { clearTimeout(toastTimer); $('#toast-host').innerHTML = '<div class="toast">' + esc(message) + '</div>'; toastTimer = setTimeout(() => { $('#toast-host').innerHTML = ''; }, 4500); }
 
   function shell(body) {
-    return '<div class="shell online-shell"><aside class="rail" aria-label="도구"><div class="brand-mark">' + icon('shield') + '</div><div class="rail-line"></div><span class="rail-word">LAST WITNESS / ONLINE</span><div class="rail-bottom"><button class="rail-button" data-action="rules" aria-label="게임 설명">' + icon('file') + '</button><button class="rail-button" data-action="settings" aria-label="효과 설정">' + icon('eye') + '</button></div></aside><header class="app-header"><div class="brand-name">마지막 목격자 <span class="accent">.</span></div><div class="header-meta"><span class="online-badge">' + (practising() ? 'PRACTICE / LOCAL' : 'ONLINE / 2–6') + '</span>' + ((token || practising()) && nickname ? '<span class="online-identity">' + esc(practising() ? game()?.self.name : nickname) + '</span>' : '') + '<button class="connection" id="connection-status" data-action="refresh" data-state="' + connection + '" title="지금 다시 동기화">' + esc(connectionText) + '</button><button class="text-button" data-action="rules">' + icon('file') + '게임 설명</button>' + (game() && room.status === 'playing' ? '<button class="text-button" data-action="private-toggle">' + icon('lock') + (privateVisible ? '내 정보 가리기' : '내 정보 확인') + '</button>' : '<button class="text-button" data-action="settings">' + icon('eye') + '효과 설정</button>') + (room ? room.status === 'playing' ? '<button class="text-button" data-action="connection-help">접속 안내</button>' : '<button class="text-button" data-action="leave">방 나가기</button>' : '') + (practising() ? '<button class="text-button" data-action="practice-exit">연습 끝내기</button>' : token && !restoring ? '<button class="text-button" data-action="logout">로그아웃</button>' : '') + '</div></header><main class="main" id="main" tabindex="-1">' + (practising() ? '<div class="case-practice-banner"><div>컴퓨터와 연습 중<small>로그인·서버 저장 없이 이 탭에서만 진행됩니다.</small></div><button class="text-button" data-action="practice-exit">연습 끝내기</button></div>' : guestSaveBanner()) + body + '</main><footer class="page-footer"><span>LAST WITNESS · ONLINE</span><span>각자의 비밀 · 함께하는 수사</span></footer></div>' + (game() && room.status === 'playing' ? discussion(game()) : '');
+    const playing = room?.status === 'playing' && !!game(), compact = playing && sevenGame();
+    const musicOpen = document.body.classList.contains('console-music-open');
+    const menu = '<button class="console-icon-button" data-action="console-menu" aria-label="설정과 게임 메뉴">' + icon('settings') + '</button>';
+    const header = '<header class="app-header console-header"><div class="console-header-brand"><span class="brand-name">마지막 목격자</span><small>THE LAST WITNESS' + (practising() ? ' · PRACTICE / LOCAL' : '') + '</small></div><div class="console-header-actions"><button class="connection console-connection" id="connection-status" data-action="refresh" data-state="' + connection + '" aria-label="접속 상태 · 다시 동기화" title="다시 동기화">' + esc(connectionText) + '</button><button class="console-icon-button" data-action="console-music" aria-label="배경음악 조절" aria-expanded="' + musicOpen + '" aria-controls="witness-bgm">' + icon('music') + '</button>' + menu + '</div></header>';
+    return '<div class="shell online-shell">' + header + '<main class="main" id="main" tabindex="-1">' + (practising() && !compact ? '<div class="case-practice-banner"><div>컴퓨터와 연습 중<small>로그인·서버 저장 없이 이 탭에서만 진행됩니다.</small></div><button class="text-button" data-action="practice-exit">연습 끝내기</button></div>' : guestSaveBanner()) + body + '</main><footer class="page-footer"><span>LAST WITNESS · 일곱 날의 기록</span><button class="text-button" data-action="rules">게임 설명</button></footer></div>' + (playing ? discussion(game()) : '');
   }
   function guestSaveBanner() {
     return token && !account && !restoring && !practising() ? '<section class="account-save-banner" aria-label="현재 참가자 자리 저장"><div><strong>현재 자리를 저장해 두세요.</strong><p>비밀번호를 등록하면 탭을 닫은 뒤에도 같은 방과 역할로 돌아올 수 있습니다.</p></div><button class="btn compact outline" data-action="upgrade">현재 자리 저장 · 비밀번호 등록</button></section>' : '';
@@ -156,14 +160,18 @@
     if (!skipCapture) captureDrafts();
     if (chatOpen && game()) chatReadCount = game().notes.length;
     const active = document.activeElement, focusId = active && (app.contains(active) || modalHost.contains(active)) ? active.id : null;
+    const focusHost = active && modalHost.contains(active) ? modalHost : app;
+    const focusAction = active && focusHost.contains(active) && active.matches?.('button[data-action]') ? ['action','id','kind','count','role'].map(key => [key, active.dataset[key]]).filter(([, value]) => value != null) : null;
     const selection = active && typeof active.selectionStart === 'number' ? [active.selectionStart, active.selectionEnd] : null;
     const scroll = [window.scrollX, window.scrollY];
     const oldChat = $('#chat-history'), chatScroll = oldChat ? { top: oldChat.scrollTop, atBottom: oldChat.scrollHeight - oldChat.scrollTop - oldChat.clientHeight < 45 } : null;
     const recordScroll = [...app.querySelectorAll('.record-scroll')].map(el => el.scrollTop);
+    document.body.dataset.console = !room ? 'landing' : room.status === 'lobby' || !room.game ? 'lobby' : room.status === 'finished' || room.game.phase === 'finished' ? sevenGame() ? 'result' : 'legacy-result' : sevenGame() ? 'game' : 'legacy';
     app.innerHTML = !room ? landing() : room.status === 'lobby' || !room.game ? lobby() : room.status === 'finished' || room.game.phase === 'finished' ? result(room.game) : publicGame(room.game);
     refreshCaseModal();
     FX?.setPrivate?.(privateVisible); document.body.classList.toggle('private-view', privateVisible);
     if (focusId) { const next = document.getElementById(focusId); if (next && !next.disabled) { next.focus({ preventScroll: true }); if (selection && typeof next.setSelectionRange === 'function' && next.type !== 'number') { try { next.setSelectionRange(...selection); } catch (_) {} } } }
+    else if (focusAction) { const next = [...focusHost.querySelectorAll('button[data-action]:not(:disabled)')].find(el => focusAction.every(([key,value]) => el.dataset[key] === value)); next?.focus({ preventScroll: true }); }
     const nextChat = $('#chat-history'); if (nextChat) nextChat.scrollTop = !chatScroll || chatScroll.atBottom ? nextChat.scrollHeight : chatScroll.top;
     app.querySelectorAll('.record-scroll').forEach((el, i) => { el.scrollTop = recordScroll[i] || 0; });
     window.scrollTo(...scroll); updateConnection(); updateAuthError();
@@ -256,7 +264,7 @@
   function openModal(kind, title, body) {
     const modern = kind.startsWith('seven-');
     lastFocus = document.activeElement; modalKind = kind;
-    modalHost.innerHTML = '<div class="modal-root ' + (modern || ['personal', 'review', 'obstruction', 'practice', 'replay'].includes(kind) ? 'case-modal-root' : '') + '"><section class="modal" role="dialog" aria-modal="' + (!['personal', 'review', 'obstruction', 'seven-personal', 'seven-review'].includes(kind)) + '" aria-labelledby="modal-title"><header class="modal-head">' + (['personal', 'review', 'seven-personal', 'seven-review'].includes(kind) ? '<button class="case-ledger-launch" data-action="ledger" aria-label="종이와 펜 · 수사기록 열기">' + icon('notebook') + '<span>수사기록</span></button>' : '') + '<div><div class="eyebrow">LAST WITNESS / ONLINE</div><h2 id="modal-title">' + title + '</h2></div><button class="close-btn" data-action="close-modal" aria-label="닫기">×</button></header>' + body + '</section></div>';
+    modalHost.innerHTML = '<div class="modal-root ' + (modern || ['personal', 'review', 'obstruction', 'practice', 'replay'].includes(kind) ? 'case-modal-root' : '') + '" data-modal-kind="' + esc(kind) + '"><section class="modal" role="dialog" aria-modal="' + (!['personal', 'review', 'obstruction', 'seven-personal', 'seven-review'].includes(kind)) + '" aria-labelledby="modal-title"><header class="modal-head">' + (['personal', 'review', 'seven-personal', 'seven-review'].includes(kind) ? '<button class="case-ledger-launch" data-action="ledger" aria-label="종이와 펜 · 수사기록 열기">' + icon('notebook') + '<span>수사기록</span></button>' : '') + '<div><div class="eyebrow">LAST WITNESS / ONLINE</div><h2 id="modal-title">' + title + '</h2></div>' + (['personal','review','seven-personal','seven-review'].includes(kind) ? '<button class="console-icon-button" data-action="chat-toggle" aria-label="자유 토론 열기">' + icon('chat') + '</button>' : '') + '<button class="close-btn" data-action="close-modal" aria-label="닫기">×</button></header>' + body + '</section></div>';
     document.body.style.overflow = 'hidden'; modalHost.querySelector('button,select,input,textarea')?.focus();
   }
   function clearPasswordFields() { ['password', 'password-confirm'].forEach(id => { const input = document.getElementById(id); if (input) input.value = ''; }); }
@@ -441,9 +449,18 @@
   }
 
   async function act(action, button) {
+    if (action === 'console-music') {
+      const open = document.body.classList.toggle('console-music-open');
+      document.querySelector('[data-action="console-music"]')?.setAttribute('aria-expanded', String(open));
+      return;
+    }
     if (sevenGame() && await Seven.handle(action, button?.dataset)) return;
     if (activeNotice && !['notice-finish', 'notice-continue', 'chat-toggle', 'send-note', 'refresh', 'practice-exit', 'logout-confirm', 'restart', 'leave-confirm'].includes(action)) { if (action === 'close-modal') finishNotice(); return; }
     const d = button?.dataset || {};
+    if (action === 'console-menu') {
+      openModal('console-menu', '사건실 메뉴', '<div class="console-menu-grid"><button class="btn outline" data-action="rules">' + icon('records') + '게임 설명</button><button class="btn outline" data-action="settings">' + icon('settings') + '화면 효과 설정</button>' + (room && !practising() ? '<button class="btn outline" data-action="connection-help">' + icon('shield') + '접속과 기록 보관</button>' : '') + (practising() ? '<button class="btn outline" data-action="practice-exit">연습 끝내기</button>' : room && room.status !== 'playing' ? '<button class="btn outline" data-action="leave">방 나가기</button>' : '') + (token && !practising() ? '<button class="btn outline" data-action="logout">로그아웃</button>' : '') + '</div>');
+      return;
+    }
     if (action === 'notice-finish') { activeNotice?.handle?.finish?.(); return; }
     if (action === 'notice-continue') { if (activeNotice?.ready) finishNotice(); return; }
     if (action === 'letter-finish') { letterHandles.forEach(h => h.finish?.()); return; }
@@ -513,11 +530,11 @@
   document.addEventListener('input', event => { if (event.target.dataset.draft && event.target.type !== 'password' && !/password/i.test(event.target.dataset.draft)) drafts[event.target.dataset.draft] = event.target.value; });
   document.addEventListener('change', event => { const el = event.target; if (el.dataset.draft && el.type !== 'password' && !/password/i.test(el.dataset.draft)) drafts[el.dataset.draft] = el.value; if (el.dataset.change === 'quality') { quality = el.value; applyFX(); } else if (el.dataset.change === 'gore') { gore = el.checked; applyFX(); } else if (el.id === 'seven-question-category') { captureDrafts(); delete drafts['seven-question-proposed']; refreshCaseModal(true); } else if (el.id === 'seven-question-target' || el.id === 'seven-testimony-category') { captureDrafts(); if (el.id === 'seven-testimony-category') delete drafts['seven-testimony-value']; refreshCaseModal(true); } else if (el.id === 'question-category' || el.id === 'question-target' || el.id === 'question-proposed') { captureDrafts(); refreshCaseModal(true); } else if (el.dataset.change === 'accuse') { const button = $('#confirm-accuse'); if (button) button.disabled = pending || !$('#accuse-person').value || !$('#accuse-place').value; } });
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') { if (Scene?.busy()) return; if (activeNotice) { event.preventDefault(); finishNotice(); return; } if (modalKind) { ledgerReturn = false; closeModal(); } privacy(); }
+    if (event.key === 'Escape') { document.body.classList.remove('console-music-open'); document.querySelector('[data-action="console-music"]')?.setAttribute('aria-expanded', 'false'); if (Scene?.busy()) return; if (activeNotice) { event.preventDefault(); finishNotice(); return; } if (modalKind) { ledgerReturn = false; closeModal(); } privacy(); }
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && event.target.id === 'chat-text') { event.preventDefault(); act('send-note'); }
     else if (event.key === 'Enter' && ['nickname', 'password', 'password-confirm'].includes(event.target.id)) { event.preventDefault(); act(modalKind === 'register' ? 'upgrade-submit' : authMode === 'register' ? 'register' : 'login'); }
     else if (event.key === 'Enter' && event.target.id === 'join-code') { event.preventDefault(); act('join'); }
-    if (event.key === 'Tab' && modalKind && !['personal', 'review', 'obstruction'].includes(modalKind)) { const list = [...modalHost.querySelectorAll('button:not(:disabled),select,input,textarea,a[href]')], first = list[0], last = list.at(-1); if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); } }
+    if (event.key === 'Tab' && modalKind && !['personal', 'review', 'obstruction', 'seven-personal', 'seven-review'].includes(modalKind)) { const list = [...modalHost.querySelectorAll('button:not(:disabled),select,input,textarea,a[href]')], first = list[0], last = list.at(-1); if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); } }
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) privacy(); else { poll(); pumpCaseCues(); } schedulePoll(); });
   window.addEventListener('focus', () => pumpCaseCues());

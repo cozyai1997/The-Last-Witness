@@ -1,0 +1,58 @@
+{
+  "generatedWith": "GPT image generation",
+  "created": "2026-10-18",
+  "assets": [
+    {
+      "id": "noir",
+      "original": ".IMG/console-v1/noir.png",
+      "mapped": "public/images/console-noir-v1.webp",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "originalSha256": "1a2b542e7f1203543ba0b8ba80e6004fab2a49032aaa765a6eb70884afad04ce",
+      "webSha256": "264f4452514e54fa2a45d3acb431a234a0657701a455a21fe411f3615a88577b",
+      "webBytes": 339892,
+      "originalBytes": 3400936,
+      "usage": [
+        "body background",
+        "brass teal dialog surfaces"
+      ]
+    },
+    {
+      "id": "paper",
+      "original": ".IMG/console-v1/paper.png",
+      "mapped": "public/images/console-paper-v1.webp",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "originalSha256": "54f05aff996b639f87d7a1cd667118c701cb64b1b8e42daf19ab250128b2f737",
+      "webSha256": "c5d63b8a7170c30d0ec525b3266ba0af8965ed9be8118ce71670034a3330f702",
+      "webBytes": 172522,
+      "originalBytes": 2916452,
+      "usage": [
+        ".seven-story",
+        ".seven-question-paper",
+        ".seven-review"
+      ]
+    },
+    {
+      "id": "map",
+      "original": ".IMG/console-v1/map.png",
+      "mapped": "public/images/console-map-v1.webp",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "originalSha256": "40ae985aa1513fc331fe97c0b44f6968ea1fcbc9356dc67212e3388b37c1910b",
+      "webSha256": "cc0065d2d543253da940b5e5310f6710a946b9b3115fcd43d43071d0f892b91d",
+      "webBytes": 245966,
+      "originalBytes": 3039536,
+      "usage": [
+        ".seven-board-place",
+        ".seven-location-map"
+      ]
+    }
+  ]
+}

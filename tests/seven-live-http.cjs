@@ -191,6 +191,10 @@ async function runSevenFlow(transport, options = {}) {
       if (modern && scenario.extended) {
         await rejectUnchanged(D, { type: 'SEARCH', recordId: round % 2 ? 'portrait' : 'tool' });
         await rejectUnchanged(D, { type: 'INVESTIGATE', kind: 'search', recordId: 'time' });
+        // Later questions may be exhausted by a valid random starter pair. Keep
+        // no-spend coverage unconditional: an unknown statement cannot use a
+        // verdict, change the room revision, or consume today's question.
+        if (round === 1) await rejectUnchanged(D, { type: 'AUDIT', statementId: 'missing-statement' });
         if (round === 2) {
           const before = (await poll(D)).game, criminalBefore = (await poll(C)).game;
           assert.ok(Actions.auditAllowed(before, firstFalseStatement.id), 'The earlier independent claim remains unresolved');
